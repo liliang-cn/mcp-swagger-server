@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 
 	"github.com/go-openapi/spec"
 	"gopkg.in/yaml.v3"
@@ -60,4 +61,9 @@ func FetchSwaggerFromURL(url string) ([]byte, error) {
 	}
 
 	return data, nil
+}
+
+// readFile reads a file from disk
+func readFile(filepath string) ([]byte, error) {
+	return os.ReadFile(filepath)
 }

@@ -26,48 +26,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Load Swagger spec
-	var swaggerSpec []byte
+	// Create MCP server using the new library interface
+	var server *mcp.Server
 	var err error
 
 	if *swaggerFile != "" {
-		swaggerSpec, err = os.ReadFile(*swaggerFile)
+		server, err = mcp.NewFromSwaggerFile(*swaggerFile, *apiBaseURL, *apiKey)
 		if err != nil {
-			log.Fatalf("Failed to read swagger file: %v", err)
+			log.Fatalf("Failed to create server from swagger file: %v", err)
 		}
 	} else if *swaggerURL != "" {
-		swaggerSpec, err = mcp.FetchSwaggerFromURL(*swaggerURL)
+		server, err = mcp.NewFromSwaggerURL(*swaggerURL, *apiBaseURL, *apiKey)
 		if err != nil {
-			log.Fatalf("Failed to fetch swagger from URL: %v", err)
+			log.Fatalf("Failed to create server from swagger URL: %v", err)
 		}
 	}
 
-	// Parse Swagger spec
-	swagger, err := mcp.ParseSwaggerSpec(swaggerSpec)
-	if err != nil {
-		log.Fatalf("Failed to parse swagger spec: %v", err)
-	}
-
-	// Determine base URL
-	baseURL := *apiBaseURL
-	if baseURL == "" {
-		// Try to extract from swagger spec
-		if swagger.Host != "" {
-			scheme := "https"
-			if len(swagger.Schemes) > 0 {
-				scheme = swagger.Schemes[0]
-			}
-			baseURL = fmt.Sprintf("%s://%s%s", scheme, swagger.Host, swagger.BasePath)
-		} else {
-			log.Fatal("API base URL not specified and cannot be determined from spec")
-		}
-	}
-
-	// Create and run MCP server
-	server := mcp.NewSwaggerMCPServer(baseURL, swagger, *apiKey)
-	
+	// Run the server with stdio transport (for CLI usage)
 	ctx := context.Background()
-	if err := server.Run(ctx); err != nil {
+	if err := server.RunStdio(ctx); err != nil {
 		log.Fatalf("Server error: %v", err)
 	}
 }
