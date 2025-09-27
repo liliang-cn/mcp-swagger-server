@@ -7,7 +7,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/mcp/swagger-server/mcp"
+	"github.com/liliang-cn/mcp-swagger-server/mcp"
 )
 
 func main() {
