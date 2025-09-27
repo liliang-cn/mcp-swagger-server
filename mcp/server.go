@@ -59,7 +59,7 @@ func (s *SwaggerMCPServer) Run(ctx context.Context) error {
 	}
 
 	// Wait for the session to end
-	session.Wait()
+	_ = session.Wait()
 	return nil
 }
 
@@ -159,7 +159,7 @@ func (s *SwaggerMCPServer) buildParametersSchema(params []spec.Parameter) interf
 			paramSchema["type"] = getJSONType(param.Type)
 		} else if param.Schema != nil {
 			// Handle body parameters with schema
-			if param.Schema.Type != nil && len(param.Schema.Type) > 0 {
+			if len(param.Schema.Type) > 0 {
 				paramSchema["type"] = param.Schema.Type[0]
 			} else {
 				paramSchema["type"] = "object"
@@ -317,7 +317,7 @@ func (s *SwaggerMCPServer) createHandler(method, path string, op *spec.Operation
 		if err != nil {
 			return nil, fmt.Errorf("request failed: %w", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// Read response
 		responseBody, err := io.ReadAll(resp.Body)
