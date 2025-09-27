@@ -1,6 +1,6 @@
 module github.com/liliang-cn/mcp-swagger-server
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/go-openapi/spec v0.22.0
