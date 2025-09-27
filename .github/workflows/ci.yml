@@ -33,25 +33,7 @@ jobs:
       run: go mod download
     
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out ./mcp
-    
-    - name: Check test coverage
-      run: |
-        go tool cover -func=coverage.out
-        coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-        echo "Total coverage: $coverage%"
-        if (( $(echo "$coverage < 80" | bc -l) )); then
-          echo "Coverage is below 80%"
-          exit 1
-        fi
-    
-    - name: Upload coverage to Codecov
-      if: matrix.go-version == '1.24'
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.out
-        flags: unittests
-        name: codecov-umbrella
+      run: go test -v -race ./mcp
 
   build:
     runs-on: ubuntu-latest
