@@ -1,4 +1,4 @@
-module github.com/mcp/swagger-server
+module github.com/liliang-cn/mcp-swagger-server
 
 go 1.25.1
 

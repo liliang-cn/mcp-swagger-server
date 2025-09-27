@@ -1,6 +1,7 @@
 # MCP Swagger Server
 
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://go.dev)
+[![Go Reference](https://pkg.go.dev/badge/github.com/liliang-cn/mcp-swagger-server.svg)](https://pkg.go.dev/github.com/liliang-cn/mcp-swagger-server)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Test Coverage](https://img.shields.io/badge/Coverage-88.8%25-brightgreen)](https://github.com/liliang-cn/mcp-swagger-server)
 [![Go Report Card](https://goreportcard.com/badge/github.com/liliang-cn/mcp-swagger-server)](https://goreportcard.com/report/github.com/liliang-cn/mcp-swagger-server)
@@ -17,11 +18,21 @@ A Model Context Protocol (MCP) server that converts Swagger/OpenAPI specificatio
 
 ## Installation
 
+### Using go install (Recommended)
+
+```bash
+go install github.com/liliang-cn/mcp-swagger-server@latest
+```
+
+This will install the `mcp-swagger-server` binary in your `$GOPATH/bin` directory.
+
+### Using go get
+
 ```bash
 go get github.com/liliang-cn/mcp-swagger-server
 ```
 
-Or clone and build from source:
+### Building from source
 
 ```bash
 git clone https://github.com/liliang-cn/mcp-swagger-server.git
