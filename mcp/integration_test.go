@@ -17,25 +17,34 @@ func TestIntegration_FullSwaggerToMCP(t *testing.T) {
 	apiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/users":
-			if r.Method == "GET" {
+			switch r.Method {
+			case "GET":
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode([]map[string]interface{}{
+				if err := json.NewEncoder(w).Encode([]map[string]interface{}{
 					{"id": 1, "name": "Alice"},
 					{"id": 2, "name": "Bob"},
-				})
-			} else if r.Method == "POST" {
+				}); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
+			case "POST":
 				var body map[string]interface{}
-				json.NewDecoder(r.Body).Decode(&body)
+				if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+					body = make(map[string]interface{})
+				}
 				body["id"] = 3
 				w.WriteHeader(http.StatusCreated)
-				json.NewEncoder(w).Encode(body)
+				if err := json.NewEncoder(w).Encode(body); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 			}
 		case "/users/1":
 			if r.Method == "GET" {
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				if err := json.NewEncoder(w).Encode(map[string]interface{}{
 					"id": 1, "name": "Alice", "email": "alice@example.com",
-				})
+				}); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+				}
 			}
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -258,15 +267,17 @@ func TestIntegration_ErrorHandling(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		case "/error":
 			w.WriteHeader(http.StatusInternalServerError)
-			json.NewEncoder(w).Encode(map[string]string{
+			if err := json.NewEncoder(w).Encode(map[string]string{
 				"error": "Internal server error",
-			})
+			}); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		case "/unauthorized":
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("Unauthorized"))
+			_, _ = w.Write([]byte("Unauthorized"))
 		default:
 			w.WriteHeader(http.StatusNotFound)
-			w.Write([]byte("Not found"))
+			_, _ = w.Write([]byte("Not found"))
 		}
 	}))
 	defer apiServer.Close()
@@ -371,12 +382,15 @@ func TestIntegration_ComplexParameters(t *testing.T) {
 		
 		if r.Method == "POST" || r.Method == "PUT" {
 			var body interface{}
-			json.NewDecoder(r.Body).Decode(&body)
-			response["body"] = body
+			if err := json.NewDecoder(r.Body).Decode(&body); err == nil {
+				response["body"] = body
+			}
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}))
 	defer apiServer.Close()
 

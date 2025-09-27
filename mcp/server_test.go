@@ -358,7 +358,7 @@ func TestCreateHandler_GET(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":     "123",
 			"status": "active",
 		})
@@ -448,14 +448,14 @@ func TestCreateHandler_POST(t *testing.T) {
 		}
 
 		var body map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&body)
+		_ = json.NewDecoder(r.Body).Decode(&body)
 
 		if body["name"] != "Test User" {
 			t.Errorf("Expected name 'Test User', got '%v'", body["name"])
 		}
 
 		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"id":   "456",
 			"name": body["name"],
 		})
@@ -520,7 +520,7 @@ func TestCreateHandler_WithAPIKey(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		_, _ = w.Write([]byte(`{"success": true}`))
 	}))
 	defer testServer.Close()
 
@@ -550,7 +550,7 @@ func TestCreateHandler_ErrorResponse(t *testing.T) {
 	// Create a test HTTP server that returns an error
 	testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(`{"error": "Bad request"}`))
+		_, _ = w.Write([]byte(`{"error": "Bad request"}`))
 	}))
 	defer testServer.Close()
 
@@ -653,7 +653,7 @@ func TestCreateHandler_ComplexPath(t *testing.T) {
 		}
 
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"success": true}`))
+		_, _ = w.Write([]byte(`{"success": true}`))
 	}))
 	defer testServer.Close()
 

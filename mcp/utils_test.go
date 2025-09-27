@@ -190,7 +190,7 @@ func TestFetchSwaggerFromURL(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(testSpec))
+		_, _ = w.Write([]byte(testSpec))
 	}))
 	defer server.Close()
 
@@ -223,7 +223,7 @@ func TestFetchSwaggerFromURL(t *testing.T) {
 func TestFetchSwaggerFromURL_404(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Not found"))
+		_, _ = w.Write([]byte("Not found"))
 	}))
 	defer server.Close()
 
@@ -312,7 +312,7 @@ func TestParseSwaggerSpec_WithDefinitions(t *testing.T) {
 		t.Fatal("Expected Pet definition to exist")
 	}
 
-	if petDef.Type == nil || len(petDef.Type) == 0 || petDef.Type[0] != "object" {
+	if len(petDef.Type) == 0 || petDef.Type[0] != "object" {
 		t.Error("Expected Pet to be of type object")
 	}
 
