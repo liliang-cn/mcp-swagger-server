@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"strings"
@@ -79,10 +80,9 @@ type HTTPTransport struct {
 
 func (t *HTTPTransport) Connect(ctx context.Context, server *mcp.Server) (*mcp.ServerSession, error) {
 	// HTTP transport doesn't use the standard MCP session model
-	// Instead, it runs as an HTTP server
-	// For now, fallback to stdio for compatibility
-	transport := &mcp.StdioTransport{}
-	return server.Connect(ctx, transport, nil)
+	// It should be handled differently in the Server.Run method
+	// This is a placeholder that should not be called for HTTP transport
+	return nil, fmt.Errorf("HTTP transport requires special handling, use Server.RunHTTP instead")
 }
 
 // DefaultConfig returns a default configuration

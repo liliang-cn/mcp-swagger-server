@@ -217,30 +217,33 @@ func (h *HTTPServer) executeAPICall(toolName string, arguments map[string]interf
 	return h.executeHTTPRequest(method, url, body, config.APIKey)
 }
 
-// findOperationByTool finds the swagger operation for a given tool name
+// findOperationByTool finds the swagger operation for a given tool name (applying filters)
 func (h *HTTPServer) findOperationByTool(toolName string, swagger *spec.Swagger) (string, string, *spec.Operation) {
+	config := h.server.GetConfig()
+	filter := config.Filter
+	
 	for path, pathItem := range swagger.Paths.Paths {
-		if pathItem.Get != nil {
+		if pathItem.Get != nil && !h.shouldExcludeOperation("GET", path, pathItem.Get, filter) {
 			if h.getToolName("GET", path, pathItem.Get) == toolName {
 				return "GET", path, pathItem.Get
 			}
 		}
-		if pathItem.Post != nil {
+		if pathItem.Post != nil && !h.shouldExcludeOperation("POST", path, pathItem.Post, filter) {
 			if h.getToolName("POST", path, pathItem.Post) == toolName {
 				return "POST", path, pathItem.Post
 			}
 		}
-		if pathItem.Put != nil {
+		if pathItem.Put != nil && !h.shouldExcludeOperation("PUT", path, pathItem.Put, filter) {
 			if h.getToolName("PUT", path, pathItem.Put) == toolName {
 				return "PUT", path, pathItem.Put
 			}
 		}
-		if pathItem.Delete != nil {
+		if pathItem.Delete != nil && !h.shouldExcludeOperation("DELETE", path, pathItem.Delete, filter) {
 			if h.getToolName("DELETE", path, pathItem.Delete) == toolName {
 				return "DELETE", path, pathItem.Delete
 			}
 		}
-		if pathItem.Patch != nil {
+		if pathItem.Patch != nil && !h.shouldExcludeOperation("PATCH", path, pathItem.Patch, filter) {
 			if h.getToolName("PATCH", path, pathItem.Patch) == toolName {
 				return "PATCH", path, pathItem.Patch
 			}
@@ -382,7 +385,7 @@ func (h *HTTPServer) executeHTTPRequest(method, url string, body io.Reader, apiK
 	}, nil
 }
 
-// getAvailableTools returns a list of available tools
+// getAvailableTools returns a list of available tools (applying filters)
 func (h *HTTPServer) getAvailableTools() []map[string]interface{} {
 	config := h.server.GetConfig()
 	if config.SwaggerSpec == nil {
@@ -391,24 +394,32 @@ func (h *HTTPServer) getAvailableTools() []map[string]interface{} {
 
 	tools := []map[string]interface{}{}
 	for path, pathItem := range config.SwaggerSpec.Paths.Paths {
-		if pathItem.Get != nil {
+		if pathItem.Get != nil && !h.shouldExcludeOperation("GET", path, pathItem.Get, config.Filter) {
 			tools = append(tools, h.createToolInfo("GET", path, pathItem.Get))
 		}
-		if pathItem.Post != nil {
+		if pathItem.Post != nil && !h.shouldExcludeOperation("POST", path, pathItem.Post, config.Filter) {
 			tools = append(tools, h.createToolInfo("POST", path, pathItem.Post))
 		}
-		if pathItem.Put != nil {
+		if pathItem.Put != nil && !h.shouldExcludeOperation("PUT", path, pathItem.Put, config.Filter) {
 			tools = append(tools, h.createToolInfo("PUT", path, pathItem.Put))
 		}
-		if pathItem.Delete != nil {
+		if pathItem.Delete != nil && !h.shouldExcludeOperation("DELETE", path, pathItem.Delete, config.Filter) {
 			tools = append(tools, h.createToolInfo("DELETE", path, pathItem.Delete))
 		}
-		if pathItem.Patch != nil {
+		if pathItem.Patch != nil && !h.shouldExcludeOperation("PATCH", path, pathItem.Patch, config.Filter) {
 			tools = append(tools, h.createToolInfo("PATCH", path, pathItem.Patch))
 		}
 	}
 
 	return tools
+}
+
+// shouldExcludeOperation checks if an operation should be excluded based on filters
+func (h *HTTPServer) shouldExcludeOperation(method, path string, operation *spec.Operation, filter *APIFilter) bool {
+	if filter == nil {
+		return false
+	}
+	return filter.ShouldExcludeOperation(method, path, operation)
 }
 
 // createToolInfo creates tool information from swagger operation
