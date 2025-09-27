@@ -12,6 +12,7 @@ func TestDefaultConfig_Basic(t *testing.T) {
 	config := DefaultConfig()
 	if config == nil {
 		t.Error("DefaultConfig should not return nil")
+		return
 	}
 	if config.Name == "" {
 		t.Error("DefaultConfig should have a name")

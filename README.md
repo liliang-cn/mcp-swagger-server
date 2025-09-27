@@ -15,6 +15,7 @@ A Model Context Protocol (MCP) server that converts Swagger/OpenAPI specificatio
 - **Multiple Transport**: Supports stdio and HTTP transport
 - **Complete Swagger Support**: Loads Swagger 2.0 and OpenAPI specifications (JSON or YAML)
 - **Auto-conversion**: Automatically converts API endpoints to MCP tools
+- **API Filtering**: Advanced filtering to control which APIs become tools
 - **Full HTTP Support**: Supports all HTTP methods (GET, POST, PUT, DELETE, PATCH)
 - **Parameter Handling**: Handles path parameters, query parameters, and request bodies
 - **Authentication**: Automatic API key authentication support
@@ -76,6 +77,21 @@ go build -o mcp-swagger-server .
 
 ```bash
 ./mcp-swagger-server -swagger examples/api.json -api-key YOUR_API_KEY
+```
+
+#### With API filtering (exclude admin endpoints):
+
+```bash
+./mcp-swagger-server -swagger examples/api.json -exclude-paths "/admin/*,/internal/*"
+```
+
+#### With multiple filtering options:
+
+```bash
+./mcp-swagger-server -swagger examples/api.json \
+  -exclude-methods "DELETE,PATCH" \
+  -exclude-tags "admin,internal" \
+  -exclude-paths "/debug/*"
 ```
 
 ### Go Library Usage
@@ -151,12 +167,60 @@ if err != nil {
 server.Run(context.Background())
 ```
 
+#### API Filtering in Go Library
+
+```go
+// Example 1: Exclude specific paths and methods
+config := mcp.DefaultConfig().
+    WithSwaggerData(swaggerData).
+    WithAPIConfig("https://api.example.com", "your-api-key").
+    WithExcludePaths("/admin/*", "/internal/*").
+    WithExcludeMethods("DELETE", "PATCH")
+
+server, err := mcp.New(config)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Example 2: Include only specific endpoints
+config := mcp.DefaultConfig().
+    WithSwaggerData(swaggerData).
+    WithAPIConfig("https://api.example.com", "your-api-key").
+    WithIncludeOnlyPaths("/users", "/users/{id}", "/posts")
+
+server, err := mcp.New(config)
+
+// Example 3: Complex filtering with custom filter
+filter := &mcp.APIFilter{
+    ExcludePathPatterns: []string{"/admin/*", "/debug/*"},
+    ExcludeMethods:      []string{"DELETE", "PATCH"},
+    ExcludeTags:         []string{"internal", "admin"},
+    IncludeOnlyOperationIDs: []string{"getUsers", "createUser", "getUser"},
+}
+
+config := mcp.DefaultConfig().
+    WithSwaggerData(swaggerData).
+    WithAPIConfig("https://api.example.com", "your-api-key").
+    WithAPIFilter(filter)
+
+server, err := mcp.New(config)
+```
+
 ## Command Line Options
 
+### Basic Options
 - `-swagger` - Path to local Swagger/OpenAPI spec file (JSON or YAML)
 - `-swagger-url` - URL to fetch Swagger/OpenAPI spec from
 - `-api-base` - Override the base URL for API calls (defaults to spec's host)
 - `-api-key` - API key for authentication
+
+### API Filtering Options
+- `-exclude-paths` - Comma-separated list of paths to exclude (supports wildcards like `/admin/*`)
+- `-exclude-operations` - Comma-separated list of operation IDs to exclude
+- `-exclude-methods` - Comma-separated list of HTTP methods to exclude (e.g., `DELETE,PATCH`)
+- `-exclude-tags` - Comma-separated list of Swagger tags to exclude
+- `-include-only-paths` - Comma-separated list of paths to include exclusively (whitelist mode)
+- `-include-only-operations` - Comma-separated list of operation IDs to include exclusively
 
 ## HTTP API Endpoints
 
@@ -186,18 +250,114 @@ curl -X POST http://localhost:7777/mcp \
   }'
 ```
 
-## Example Swagger Spec
+## Examples
+
+### Example Swagger Spec
 
 The `examples/petstore.json` file contains a sample Swagger specification for testing.
+
+### API Filtering Example
+
+Run the API filtering example to see how different filtering options work:
+
+```bash
+go run examples/api_filtering/main.go
+```
+
+This example demonstrates:
+- Path-based exclusion
+- HTTP method filtering  
+- Include-only (whitelist) mode
+- Wildcard pattern matching
+- Complex filtering combinations
+- Direct filter testing
+
+## API Filtering
+
+The MCP Swagger Server supports comprehensive API filtering to control which endpoints are exposed as MCP tools. This is essential for security and to prevent unwanted API access.
+
+### Filtering Methods
+
+#### 1. Path-based Filtering
+```bash
+# Exclude specific paths
+-exclude-paths "/admin,/internal,/debug"
+
+# Exclude paths with wildcards
+-exclude-paths "/admin/*,/internal/*,/v1/debug/*"
+
+# Include only specific paths (whitelist mode)
+-include-only-paths "/users,/users/{id},/posts"
+```
+
+#### 2. HTTP Method Filtering
+```bash
+# Exclude dangerous methods
+-exclude-methods "DELETE,PATCH"
+
+# Only allow read operations
+-include-only-methods "GET"
+```
+
+#### 3. Operation ID Filtering
+```bash
+# Exclude specific operations
+-exclude-operations "deleteUser,deleteAllData,resetSystem"
+
+# Include only specific operations
+-include-only-operations "getUsers,getUser,createUser"
+```
+
+#### 4. Tag-based Filtering
+```bash
+# Exclude operations with specific tags
+-exclude-tags "admin,internal,debug"
+```
+
+### Filtering Priority
+
+1. **Include-only filters** are applied first (if specified)
+2. **Exclude filters** are applied second
+3. If both include-only and exclude filters are specified, an endpoint must pass both
+
+### Wildcard Patterns
+
+The filtering system supports wildcard patterns for paths:
+- `*` matches any characters within a path segment
+- `/admin/*` matches `/admin/users`, `/admin/settings`, etc.
+- `/api/v*/admin` matches `/api/v1/admin`, `/api/v2/admin`, etc.
+
+### Security Best Practices
+
+1. **Always exclude administrative endpoints**: Use `-exclude-paths "/admin/*"`
+2. **Limit dangerous HTTP methods**: Use `-exclude-methods "DELETE,PATCH"`
+3. **Use whitelist mode for sensitive APIs**: Use `-include-only-paths` for maximum control
+4. **Exclude internal/debug endpoints**: Use `-exclude-tags "internal,debug"`
+
+### Examples
+
+```bash
+# Security-focused filtering
+./mcp-swagger-server -swagger api.json \
+  -exclude-paths "/admin/*,/internal/*,/debug/*" \
+  -exclude-methods "DELETE,PATCH" \
+  -exclude-tags "admin,internal"
+
+# Whitelist mode - only allow user operations
+./mcp-swagger-server -swagger api.json \
+  -include-only-paths "/users,/users/{id}" \
+  -include-only-operations "getUsers,getUser,createUser"
+```
 
 ## How It Works
 
 1. The server loads a Swagger/OpenAPI specification
-2. Each API endpoint is converted to an MCP tool
-3. Tool names are derived from the operation ID or the path
-4. Parameters are converted to MCP tool input schemas
-5. When a tool is called, the server makes the corresponding HTTP request
-6. Response data is returned to the MCP client
+2. API filtering rules are applied to determine which endpoints to expose
+3. Each allowed API endpoint is converted to an MCP tool
+4. Tool names are derived from the operation ID or the path
+5. Parameters are converted to MCP tool input schemas
+6. When a tool is called, the server makes the corresponding HTTP request
+7. Response data is returned to the MCP client
 
 ## MCP Client Configuration
 
@@ -234,6 +394,7 @@ The project includes comprehensive unit tests covering:
 - Base URL inference and parameter handling
 - Transport layer functionality
 - Core library creation and validation logic
+- API filtering and exclusion rules
 
 ## Contributing
 
