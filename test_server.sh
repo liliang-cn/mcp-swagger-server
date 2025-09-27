@@ -1,0 +1,17 @@
+#!/bin/bash
+
+echo "Testing MCP Swagger Server with Petstore example..."
+echo ""
+echo "Starting server with local Swagger file:"
+echo "./mcp-swagger-server -swagger examples/petstore.json"
+echo ""
+echo "The server expects stdio input/output for MCP protocol."
+echo "It should list the following tools when connected:"
+echo "  - listpets (GET /pets)"
+echo "  - createpet (POST /pets)"  
+echo "  - getpetbyid (GET /pets/{petId})"
+echo "  - updatepet (PUT /pets/{petId})"
+echo "  - deletepet (DELETE /pets/{petId})"
+echo "  - searchpets (POST /pets/search)"
+echo ""
+echo "To test manually, run the server and send MCP protocol messages via stdin."
