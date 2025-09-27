@@ -1,0 +1,232 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Petstore API",
+    "description": "A simple Petstore API for testing"
+  },
+  "host": "petstore.swagger.io",
+  "basePath": "/v2",
+  "schemes": ["https"],
+  "paths": {
+    "/pets": {
+      "get": {
+        "operationId": "listPets",
+        "summary": "List all pets",
+        "description": "Returns a list of all pets in the store",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many items to return at one time (max 100)",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          },
+          {
+            "name": "tags",
+            "in": "query",
+            "description": "Tags to filter by",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A paged array of pets",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Pet"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPet",
+        "summary": "Create a pet",
+        "description": "Create a new pet in the store",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Pet to add to the store",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NewPet"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Pet created",
+            "schema": {
+              "$ref": "#/definitions/Pet"
+            }
+          }
+        }
+      }
+    },
+    "/pets/{petId}": {
+      "get": {
+        "operationId": "getPetById",
+        "summary": "Get a pet by ID",
+        "description": "Returns a single pet",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "The id of the pet to retrieve",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Expected response to a valid request",
+            "schema": {
+              "$ref": "#/definitions/Pet"
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updatePet",
+        "summary": "Update a pet",
+        "description": "Update an existing pet by ID",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "The id of the pet to update",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Updated pet object",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NewPet"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pet updated",
+            "schema": {
+              "$ref": "#/definitions/Pet"
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletePet",
+        "summary": "Delete a pet",
+        "description": "Delete a pet by ID",
+        "parameters": [
+          {
+            "name": "petId",
+            "in": "path",
+            "description": "The id of the pet to delete",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Pet deleted"
+          }
+        }
+      }
+    },
+    "/pets/search": {
+      "post": {
+        "operationId": "searchPets",
+        "summary": "Search for pets",
+        "description": "Search for pets using various criteria",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "description": "Search criteria",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Pet name to search for"
+                },
+                "tag": {
+                  "type": "string",
+                  "description": "Tag to filter by"
+                },
+                "minAge": {
+                  "type": "integer",
+                  "description": "Minimum age"
+                },
+                "maxAge": {
+                  "type": "integer",
+                  "description": "Maximum age"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Pet"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Pet": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": {
+        "id": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "name": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "age": {
+          "type": "integer"
+        }
+      }
+    },
+    "NewPet": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
+        "age": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}
