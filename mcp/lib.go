@@ -85,11 +85,26 @@ func NewFromSwaggerSpec(swagger *spec.Swagger, apiBaseURL, apiKey string) (*Serv
 	return New(config)
 }
 
+// NewFromSwaggerData creates a server from raw swagger data
+func NewFromSwaggerData(data []byte, apiBaseURL, apiKey string) (*Server, error) {
+	config := DefaultConfig().
+		WithSwaggerData(data).
+		WithAPIConfig(apiBaseURL, apiKey)
+	
+	return New(config)
+}
+
 // Run starts the MCP server with the configured transport
 func (s *Server) Run(ctx context.Context) error {
 	log.Printf("Starting MCP server %s %s...", s.config.Name, s.config.Version)
 	
-	// Connect using the configured transport
+	// Check if this is HTTP transport
+	if httpTransport, ok := s.config.Transport.(*HTTPTransport); ok {
+		// Use HTTP transport
+		return s.RunHTTP(ctx, httpTransport.Port)
+	}
+	
+	// Connect using the configured transport (stdio)
 	session, err := s.config.Transport.Connect(ctx, s.mcp.server)
 	if err != nil {
 		return fmt.Errorf("failed to connect MCP server: %w", err)
