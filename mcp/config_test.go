@@ -13,6 +13,7 @@ func TestDefaultConfig(t *testing.T) {
 	
 	if config == nil {
 		t.Error("DefaultConfig() returned nil")
+		return
 	}
 	if config.Name != "swagger-mcp-server" {
 		t.Errorf("DefaultConfig() Name = %v, want %v", config.Name, "swagger-mcp-server")

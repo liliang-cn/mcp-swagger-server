@@ -19,10 +19,16 @@ type SwaggerMCPServer struct {
 	apiBaseURL string
 	swagger    *spec.Swagger
 	apiKey     string
+	filter     *APIFilter
 }
 
 // NewSwaggerMCPServer creates a new MCP server from Swagger spec
 func NewSwaggerMCPServer(apiBaseURL string, swaggerSpec *spec.Swagger, apiKey string) *SwaggerMCPServer {
+	return NewSwaggerMCPServerWithFilter(apiBaseURL, swaggerSpec, apiKey, nil)
+}
+
+// NewSwaggerMCPServerWithFilter creates a new MCP server from Swagger spec with filtering
+func NewSwaggerMCPServerWithFilter(apiBaseURL string, swaggerSpec *spec.Swagger, apiKey string, filter *APIFilter) *SwaggerMCPServer {
 	// Create MCP server with Implementation
 	implementation := &mcp.Implementation{
 		Name:    "swagger-mcp-server",
@@ -37,6 +43,7 @@ func NewSwaggerMCPServer(apiBaseURL string, swaggerSpec *spec.Swagger, apiKey st
 		apiBaseURL: apiBaseURL,
 		swagger:    swaggerSpec,
 		apiKey:     apiKey,
+		filter:     filter,
 	}
 
 	// Register tools from Swagger
@@ -98,6 +105,11 @@ func (s *SwaggerMCPServer) registerPathTools(path string, pathItem spec.PathItem
 }
 
 func (s *SwaggerMCPServer) registerOperation(method, path string, op *spec.Operation) {
+	// Check if this operation should be excluded
+	if s.filter != nil && s.filter.ShouldExcludeOperation(method, path, op) {
+		return // Skip this operation
+	}
+
 	// Generate tool name
 	toolName := ""
 	if op.ID != "" {

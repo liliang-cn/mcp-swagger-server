@@ -39,8 +39,8 @@ func New(config *Config) (*Server, error) {
 		config.APIBaseURL = inferBaseURL(config.SwaggerSpec)
 	}
 	
-	// Create the underlying MCP server
-	mcpServer := NewSwaggerMCPServer(config.APIBaseURL, config.SwaggerSpec, config.APIKey)
+	// Create the underlying MCP server with filtering support
+	mcpServer := NewSwaggerMCPServerWithFilter(config.APIBaseURL, config.SwaggerSpec, config.APIKey, config.Filter)
 	
 	return &Server{
 		config: config,
