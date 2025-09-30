@@ -1,203 +1,166 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/liliang-cn/mcp-swagger-server/mcp"
 )
 
 func main() {
-	fmt.Println("=== HTTP Transport Example ===")
+	var (
+		swaggerFile = flag.String("swagger", "../../test/petstore.json", "Path to Swagger/OpenAPI spec file")
+		apiBaseURL  = flag.String("api-base", "https://petstore.swagger.io/v2", "Base URL for API calls")
+		httpPort    = flag.Int("port", 3218, "HTTP server port")
+		httpHost    = flag.String("host", "localhost", "HTTP server host")
+		demo        = flag.Bool("demo", false, "Run demo mode with test calls")
+	)
 
-	// 创建一个示例 Swagger 规范
-	swaggerData := []byte(`{
-		"swagger": "2.0",
-		"info": {
-			"title": "Example API",
-			"version": "1.0.0"
-		},
-		"host": "jsonplaceholder.typicode.com",
-		"schemes": ["https"],
-		"basePath": "",
-		"paths": {
-			"/posts": {
-				"get": {
-					"operationId": "getPosts",
-					"summary": "获取所有帖子",
-					"parameters": [
-						{
-							"name": "userId",
-							"in": "query",
-							"type": "integer",
-							"description": "按用户ID过滤"
-						}
-					]
-				}
-			},
-			"/posts/{id}": {
-				"get": {
-					"operationId": "getPost",
-					"summary": "获取单个帖子",
-					"parameters": [
-						{
-							"name": "id",
-							"in": "path",
-							"required": true,
-							"type": "integer",
-							"description": "帖子ID"
-						}
-					]
-				}
-			},
-			"/users": {
-				"get": {
-					"operationId": "getUsers",
-					"summary": "获取所有用户"
-				}
-			}
-		}
-	}`)
+	flag.Parse()
 
-	// 方法1: 使用配置创建HTTP服务器
-	fmt.Println("\n方法1: 使用配置创建HTTP服务器")
-	config := mcp.DefaultConfig().
-		WithSwaggerData(swaggerData).
-		WithAPIConfig("https://jsonplaceholder.typicode.com", ""). // 使用 JSONPlaceholder 作为测试API
-		WithHTTPTransport(7777, "localhost", "/mcp")
-
-	server, err := mcp.New(config)
+	// Read swagger file
+	data, err := os.ReadFile(*swaggerFile)
 	if err != nil {
-		log.Fatalf("创建服务器失败: %v", err)
+		log.Fatalf("Failed to read swagger file: %v", err)
 	}
 
-	// 在后台启动HTTP服务器
+	// Create server configuration with HTTP transport
+	config := mcp.DefaultConfig().
+		WithSwaggerData(data).
+		WithAPIConfig(*apiBaseURL, "").
+		WithHTTPTransport(*httpPort, *httpHost, "/mcp")
+
+	// Create server
+	server, err := mcp.New(config)
+	if err != nil {
+		log.Fatalf("Failed to create server: %v", err)
+	}
+
+	// Create context with cancellation
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Handle shutdown gracefully
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		fmt.Printf("正在启动HTTP服务器，地址: http://localhost:7777\n")
-		if err := server.Run(ctx); err != nil {
-			log.Printf("HTTP服务器错误: %v", err)
-		}
+		<-sigChan
+		log.Println("\nShutting down...")
+		cancel()
 	}()
 
-	// 方法2: 直接使用RunHTTP
-	fmt.Println("\n方法2: 直接使用RunHTTP (在端口8888)")
-	server2, err := mcp.NewFromSwaggerData(swaggerData, "https://jsonplaceholder.typicode.com", "")
-	if err != nil {
-		log.Fatalf("创建服务器2失败: %v", err)
+	// Start server in background
+	serverErrChan := make(chan error, 1)
+	go func() {
+		serverErrChan <- server.RunHTTP(ctx, *httpPort)
+	}()
+
+	// Wait for server to start
+	time.Sleep(1 * time.Second)
+
+	// Print server info
+	fmt.Println("=== MCP Swagger Server (HTTP Mode) ===")
+	fmt.Printf("Server running on: http://%s:%d\n", *httpHost, *httpPort)
+	fmt.Println("\nAvailable endpoints:")
+	fmt.Printf("  - Health check: http://%s:%d/health\n", *httpHost, *httpPort)
+	fmt.Printf("  - Tools list:   http://%s:%d/tools\n", *httpHost, *httpPort)
+	fmt.Printf("  - MCP endpoint: http://%s:%d/mcp\n", *httpHost, *httpPort)
+	fmt.Println("\nPress Ctrl+C to stop the server")
+
+	// If demo mode, run test calls
+	if *demo {
+		fmt.Println("\n=== Running Demo Mode ===")
+		runDemoTests(*httpHost, *httpPort)
 	}
 
-	go func() {
-		fmt.Printf("正在启动HTTP服务器2，地址: http://localhost:8888\n")
-		if err := server2.RunHTTP(ctx, 8888); err != nil {
-			log.Printf("HTTP服务器2错误: %v", err)
+	// Wait for server error or shutdown
+	select {
+	case err := <-serverErrChan:
+		if err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server error: %v", err)
 		}
-	}()
-
-	// 等待服务器启动
-	time.Sleep(2 * time.Second)
-
-	// 测试HTTP端点
-	fmt.Println("\n=== 测试HTTP端点 ===")
-	
-	// 测试健康检查
-	testEndpoint("GET", "http://localhost:7777/health", "健康检查")
-	testEndpoint("GET", "http://localhost:8888/health", "健康检查 (服务器2)")
-
-	// 测试工具列表
-	testEndpoint("GET", "http://localhost:7777/tools", "工具列表")
-
-	// 测试MCP工具调用
-	testMCPCall("http://localhost:7777/mcp", "getPosts", map[string]interface{}{
-		"userId": 1,
-	})
-
-	testMCPCall("http://localhost:7777/mcp", "getPost", map[string]interface{}{
-		"id": 1,
-	})
-
-	testMCPCall("http://localhost:7777/mcp", "getUsers", map[string]interface{}{})
-
-	fmt.Println("\n=== HTTP Transport 说明 ===")
-	fmt.Println("1. 使用 WithHTTPTransport() 配置HTTP传输")
-	fmt.Println("2. 或者直接使用 server.RunHTTP(ctx, port)")
-	fmt.Println("3. 访问端点:")
-	fmt.Println("   - GET /health - 健康检查")
-	fmt.Println("   - GET /tools - 获取可用工具列表")
-	fmt.Println("   - POST /mcp - 执行MCP请求")
-	fmt.Println("\n4. MCP请求格式:")
-	fmt.Println(`   {
-     "method": "tools/call",
-     "params": {
-       "name": "工具名称",
-       "arguments": {参数}
-     }
-   }`)
-	
-	// 保持服务器运行一段时间以便测试
-	fmt.Println("\n服务器将继续运行30秒，你可以在浏览器中测试端点...")
-	time.Sleep(30 * time.Second)
-	
-	fmt.Println("示例结束")
+	case <-ctx.Done():
+		fmt.Println("Server stopped")
+	}
 }
 
-// testEndpoint 测试HTTP端点
-func testEndpoint(method, url, description string) {
-	fmt.Printf("\n测试 %s: %s %s\n", description, method, url)
+// runDemoTests runs demo test calls
+func runDemoTests(host string, port int) {
+	baseURL := fmt.Sprintf("http://%s:%d", host, port)
 	
-	resp, err := http.Get(url)
+	// Test health endpoint
+	fmt.Println("\n1. Testing health endpoint...")
+	resp, err := http.Get(baseURL + "/health")
 	if err != nil {
-		fmt.Printf("  ❌ 错误: %v\n", err)
+		log.Printf("Health check failed: %v", err)
 		return
 	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Printf("  ⚠️ 关闭响应体失败: %v\n", err)
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	fmt.Printf("   Response: %s\n", string(body))
+	
+	// Test tools list
+	fmt.Println("\n2. Testing tools list endpoint...")
+	resp, err = http.Get(baseURL + "/tools")
+	if err != nil {
+		log.Printf("Tools list failed: %v", err)
+		return
+	}
+	defer resp.Body.Close()
+	body, _ = io.ReadAll(resp.Body)
+	
+	var toolsResponse map[string]interface{}
+	if err := json.Unmarshal(body, &toolsResponse); err == nil {
+		if tools, ok := toolsResponse["tools"].([]interface{}); ok {
+			fmt.Printf("   Found %d tools:\n", len(tools))
+			for i, tool := range tools {
+				if toolMap, ok := tool.(map[string]interface{}); ok {
+					fmt.Printf("   %d. %s - %s\n", i+1, toolMap["name"], toolMap["description"])
+				}
+			}
 		}
-	}()
+	}
 	
-	fmt.Printf("  ✅ 状态码: %d\n", resp.StatusCode)
-}
-
-// testMCPCall 测试MCP工具调用
-func testMCPCall(url, toolName string, arguments map[string]interface{}) {
-	fmt.Printf("\n测试MCP调用: %s\n", toolName)
-	
-	payload := map[string]interface{}{
+	// Test MCP call
+	fmt.Println("\n3. Testing MCP tool call...")
+	mcpRequest := map[string]interface{}{
 		"method": "tools/call",
 		"params": map[string]interface{}{
-			"name":      toolName,
-			"arguments": arguments,
+			"name": "getpet",
+			"arguments": map[string]interface{}{
+				"petId": 1,
+			},
 		},
 	}
 	
-	client := &http.Client{Timeout: 10 * time.Second}
-	
-	// 这里只是测试请求格式，实际调用需要JSON body
-	req, err := http.NewRequest("POST", url, nil)
+	jsonData, _ := json.Marshal(mcpRequest)
+	resp, err = http.Post(baseURL+"/mcp", "application/json", bytes.NewReader(jsonData))
 	if err != nil {
-		fmt.Printf("  ❌ 创建请求失败: %v\n", err)
+		log.Printf("MCP call failed: %v", err)
 		return
 	}
+	defer resp.Body.Close()
+	body, _ = io.ReadAll(resp.Body)
 	
-	req.Header.Set("Content-Type", "application/json")
-	
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Printf("  ❌ 请求失败: %v\n", err)
-		return
-	}
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			fmt.Printf("  ⚠️ 关闭响应体失败: %v\n", err)
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err == nil {
+		fmt.Printf("   Response status: %d\n", resp.StatusCode)
+		if resp.StatusCode == 200 {
+			fmt.Println("   Tool call successful!")
+		} else {
+			fmt.Printf("   Error: %v\n", result)
 		}
-	}()
+	}
 	
-	fmt.Printf("  ✅ MCP端点响应状态码: %d\n", resp.StatusCode)
-	fmt.Printf("  📝 请求格式: %+v\n", payload)
+	fmt.Println("\nDemo complete! Server continues running...")
 }

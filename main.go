@@ -23,13 +23,20 @@ func main() {
 		excludeTags         = flag.String("exclude-tags", "", "Comma-separated list of tags to exclude")
 		includeOnlyPaths    = flag.String("include-only-paths", "", "Comma-separated list of paths to include exclusively")
 		includeOnlyOps      = flag.String("include-only-operations", "", "Comma-separated list of operation IDs to include exclusively")
+		httpPort            = flag.Int("http-port", 0, "HTTP server port (0 = disabled, use stdio transport)")
+		httpHost            = flag.String("http-host", "localhost", "HTTP server host")
+		httpPath            = flag.String("http-path", "/mcp", "HTTP server path for MCP endpoint")
 	)
 
 	flag.Parse()
 
 	// Validate inputs
 	if *swaggerFile == "" && *swaggerURL == "" {
-		fmt.Fprintf(os.Stderr, "Usage: %s -swagger <file> | -swagger-url <url> [-api-base <url>] [-api-key <key>] [filtering options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s -swagger <file> | -swagger-url <url> [-api-base <url>] [-api-key <key>] [transport options] [filtering options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "\nTransport options:\n")
+		fmt.Fprintf(os.Stderr, "  -http-port: HTTP server port (default: 0 = use stdio)\n")
+		fmt.Fprintf(os.Stderr, "  -http-host: HTTP server host (default: localhost)\n")
+		fmt.Fprintf(os.Stderr, "  -http-path: HTTP server path (default: /mcp)\n")
 		fmt.Fprintf(os.Stderr, "\nFiltering options:\n")
 		fmt.Fprintf(os.Stderr, "  -exclude-paths: Comma-separated paths to exclude (supports wildcards)\n")
 		fmt.Fprintf(os.Stderr, "  -exclude-operations: Comma-separated operation IDs to exclude\n")
@@ -140,10 +147,23 @@ func main() {
 		}
 	}
 
-	// Run the server with stdio transport (for CLI usage)
+	// Run the server with appropriate transport
 	ctx := context.Background()
-	if err := server.RunStdio(ctx); err != nil {
-		log.Fatalf("Server error: %v", err)
+	
+	if *httpPort > 0 {
+		// Use HTTP transport
+		config := server.GetConfig()
+		config.WithHTTPTransport(*httpPort, *httpHost, *httpPath)
+		log.Printf("Starting MCP server with HTTP transport on %s:%d%s", *httpHost, *httpPort, *httpPath)
+		if err := server.RunHTTP(ctx, *httpPort); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
+	} else {
+		// Use stdio transport (default for CLI usage)
+		log.Println("Starting MCP server with stdio transport")
+		if err := server.RunStdio(ctx); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
 	}
 }
 

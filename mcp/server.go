@@ -52,12 +52,17 @@ func NewSwaggerMCPServerWithFilter(apiBaseURL string, swaggerSpec *spec.Swagger,
 	return converter
 }
 
-// Run starts the MCP server with stdio transport
+// Run starts the MCP server with stdio transport (backward compatibility)
 func (s *SwaggerMCPServer) Run(ctx context.Context) error {
+	return s.RunStdio(ctx)
+}
+
+// RunStdio starts the MCP server with stdio transport
+func (s *SwaggerMCPServer) RunStdio(ctx context.Context) error {
 	// Create stdio transport
 	transport := &mcp.StdioTransport{}
 
-	log.Println("Starting MCP server from Swagger...")
+	log.Println("Starting MCP server from Swagger with stdio transport...")
 
 	// Connect and run the server
 	session, err := s.server.Connect(ctx, transport, nil)
@@ -68,6 +73,24 @@ func (s *SwaggerMCPServer) Run(ctx context.Context) error {
 	// Wait for the session to end
 	_ = session.Wait()
 	return nil
+}
+
+// RunHTTP starts the MCP server with HTTP transport
+func (s *SwaggerMCPServer) RunHTTP(addr string) error {
+	log.Printf("Starting MCP server from Swagger with HTTP transport on %s...", addr)
+	
+	// Create the streamable HTTP handler
+	handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+		return s.server
+	}, nil)
+
+	// Start the HTTP server
+	return http.ListenAndServe(addr, handler)
+}
+
+// GetServer returns the underlying MCP server (useful for custom transport implementations)
+func (s *SwaggerMCPServer) GetServer() *mcp.Server {
+	return s.server
 }
 
 // RegisterTools creates MCP tools from Swagger endpoints
