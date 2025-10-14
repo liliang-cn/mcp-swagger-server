@@ -89,7 +89,7 @@ func (t *HTTPTransport) Connect(ctx context.Context, server *mcp.Server) (*mcp.S
 func DefaultConfig() *Config {
 	return &Config{
 		Name:        "swagger-mcp-server",
-		Version:     "v0.2.0",
+		Version:     "v1.0.0",
 		Description: "MCP server generated from Swagger/OpenAPI specification",
 		Transport:   &StdioTransport{},
 	}
