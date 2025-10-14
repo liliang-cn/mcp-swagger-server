@@ -1,0 +1,104 @@
+{
+  "testSuite": {
+    "serverName": "testing-demo",
+    "totalTests": 7,
+    "passedTests": 7,
+    "failedTests": 0,
+    "results": [
+      {
+        "toolName": "tools/list",
+        "success": true,
+        "duration": 11029958,
+        "data": {
+          "count": 5,
+          "message": "Tools list retrieved successfully"
+        }
+      },
+      {
+        "toolName": "listPets",
+        "success": true,
+        "duration": 15043125,
+        "data": {
+          "count": 3,
+          "message": "Pets listed successfully",
+          "pets": [
+            "Buddy",
+            "Mittens",
+            "Goldie"
+          ]
+        }
+      },
+      {
+        "toolName": "createPet",
+        "success": true,
+        "duration": 21029875,
+        "data": {
+          "message": "Pet created successfully",
+          "pet": {
+            "id": 6,
+            "name": "Test Pet",
+            "tag": "test"
+          }
+        }
+      },
+      {
+        "toolName": "getPetById",
+        "success": true,
+        "duration": 13032375,
+        "data": {
+          "message": "Pet retrieved successfully",
+          "pet": {
+            "age": 3,
+            "id": 1,
+            "name": "Buddy",
+            "tag": "dog"
+          }
+        }
+      },
+      {
+        "toolName": "updatePet",
+        "success": true,
+        "duration": 18908167,
+        "data": {
+          "message": "Pet updated successfully",
+          "pet": {
+            "age": 4,
+            "id": 1,
+            "name": "Buddy Updated",
+            "tag": "dog"
+          }
+        }
+      },
+      {
+        "toolName": "searchPets",
+        "success": true,
+        "duration": 26058792,
+        "data": {
+          "count": 2,
+          "criteria": {
+            "tag": "dog"
+          },
+          "message": "Pets searched successfully",
+          "pets": [
+            "Buddy",
+            "Charlie"
+          ]
+        }
+      },
+      {
+        "toolName": "error_handling",
+        "success": true,
+        "duration": 5641667,
+        "data": {
+          "message": "Error handling tests passed",
+          "tests": [
+            "Invalid tool name rejection",
+            "Missing arguments rejection",
+            "Invalid argument format rejection"
+          ]
+        }
+      }
+    ]
+  },
+  "timestamp": "2025-10-14T11:14:40+08:00"
+}

@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/go-openapi/spec v0.22.0
-	github.com/modelcontextprotocol/go-sdk v0.8.0
+	github.com/modelcontextprotocol/go-sdk v1.0.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 

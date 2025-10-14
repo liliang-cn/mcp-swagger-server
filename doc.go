@@ -11,13 +11,18 @@
 //
 // # Features
 //
-//   - Automatic conversion of Swagger/OpenAPI endpoints to MCP tools
-//   - Support for Swagger 2.0 and OpenAPI 3.0 specifications
-//   - Handles JSON and YAML specification formats
+//   - Automatic conversion of Swagger/OpenAPI endpoints to MCP tools with proper schema generation
+//   - Support for Swagger 2.0 and OpenAPI 3.0 specifications (JSON and YAML formats)
 //   - Full support for HTTP methods: GET, POST, PUT, DELETE, PATCH
-//   - Automatic parameter handling (path, query, body)
-//   - API key authentication support
+//   - Intelligent parameter handling (path, query, body)
+//   - API key authentication support with multiple header formats
 //   - Real-time API request execution
+//   - Advanced API filtering system with path, method, tag, and operation ID filtering
+//   - Dual transport support: stdio and HTTP with CORS
+//   - Built-in HTTP API endpoints for health checks and tool listing
+//   - Comprehensive error handling with proper HTTP status codes
+//   - JSON response formatting and validation
+//   - Flexible configuration system with fluent API
 //
 // # Installation
 //
@@ -43,16 +48,42 @@
 //
 //	mcp-swagger-server -swagger api.yaml -api-base https://api.production.com
 //
+// With HTTP transport:
+//
+//	mcp-swagger-server -swagger api.json -http-port 8127
+//
+// With filtering:
+//
+//	mcp-swagger-server -swagger api.json -exclude-paths "/admin/*" -exclude-methods "DELETE"
+//
 // # Command Line Flags
 //
 //	-swagger string
-//	    Path to local Swagger/OpenAPI specification file
+//	    Path to local Swagger/OpenAPI specification file (JSON or YAML)
 //	-swagger-url string
 //	    URL to fetch Swagger/OpenAPI specification from
 //	-api-base string
 //	    Override base URL for API requests (optional)
 //	-api-key string
 //	    API key for authentication (optional)
+//	-http-port int
+//	    HTTP server port (default: 0 = use stdio transport)
+//	-http-host string
+//	    HTTP server host (default: localhost)
+//	-http-path string
+//	    HTTP server path for MCP endpoint (default: /mcp)
+//	-exclude-paths string
+//	    Comma-separated paths to exclude (supports wildcards)
+//	-exclude-operations string
+//	    Comma-separated operation IDs to exclude
+//	-exclude-methods string
+//	    Comma-separated HTTP methods to exclude
+//	-exclude-tags string
+//	    Comma-separated tags to exclude
+//	-include-only-paths string
+//	    Include only these paths (exclusive mode)
+//	-include-only-operations string
+//	    Include only these operation IDs (exclusive mode)
 //
 // # MCP Integration
 //

@@ -1,5 +1,26 @@
 # MCP Swagger Server 使用指南
 
+> **📖 文档**: [中文文档](README_CN.md) | [English Documentation](README.md)
+
+## 功能特性概览
+
+MCP Swagger Server 提供了以下核心功能：
+
+### 核心特性
+- **双模式支持**: 既可作为独立CLI工具，也可作为Go库集成
+- **多种传输方式**: 支持标准输入输出和HTTP传输，HTTP传输包含跨域资源共享支持
+- **完整的接口规范支持**: 支持Swagger 2.0和OpenAPI规范（JSON和YAML格式）
+- **自动转换**: 自动将应用程序接口端点转换为MCP工具，包含完整的模式生成
+- **高级接口过滤**: 全面的过滤系统，精确控制哪些接口成为工具
+- **完整超文本传输协议支持**: 支持所有HTTP方法（GET、POST、PUT、DELETE、PATCH）
+- **智能参数处理**: 智能处理路径参数、查询参数和请求体
+- **认证支持**: 自动应用程序接口密钥认证，支持多种头格式
+- **网络集成**: 轻松集成到现有Go网络应用程序
+- **超文本传输协议接口端点**: 内置HTTP端点用于工具列表和健康检查
+- **错误处理**: 完善的错误处理和适当的HTTP状态码
+- **JSON格式化**: 自动JSON响应格式化和验证
+- **灵活配置**: 灵活的配置系统和流畅的应用程序接口
+
 ## 问题解答：MCP端点没有响应的原因
 
 你遇到的问题是因为 **MCP 服务器有两种不同的传输方式 (transport)**：
@@ -36,7 +57,7 @@ func main() {
     config := mcp.DefaultConfig().
         WithSwaggerFile("api.json").
         WithAPIConfig("https://api.example.com", "your-api-key").
-        WithHTTPTransport(7777, "localhost", "/mcp")
+        WithHTTPTransport(8127, "localhost", "/mcp")
 
     // 创建服务器
     server, err := mcp.New(config)
@@ -69,41 +90,61 @@ func main() {
 
     // 直接启动HTTP服务器
     ctx := context.Background()
-    server.RunHTTP(ctx, 8888)
+    server.RunHTTP(ctx, 6724)
 }
 ```
 
 ### 方法3: 命令行启动HTTP服务器
 
-目前命令行工具默认使用stdio transport。如果你想要HTTP transport，需要修改main.go或使用库方式。
+现在命令行工具原生支持HTTP transport：
+
+```bash
+# 启动HTTP服务器
+./mcp-swagger-server -swagger api.json -http-port 8127
+
+# 带过滤的HTTP服务器
+./mcp-swagger-server -swagger api.json \
+  -http-port 8127 \
+  -exclude-methods "DELETE,PATCH" \
+  -exclude-paths "/admin/*"
+
+# 自定义主机和路径
+./mcp-swagger-server -swagger api.json \
+  -http-port 8127 \
+  -http-host 0.0.0.0 \
+  -http-path /api/mcp
+```
 
 ## HTTP API 端点
 
 当使用HTTP transport时，服务器提供以下端点：
 
 ```bash
-GET  /health          # 健康检查
-GET  /tools           # 获取可用工具列表  
-POST /mcp             # 执行MCP请求
+GET  /health          # 健康检查，返回状态信息
+GET  /tools           # 获取可用工具列表，包含详细信息
+POST /mcp             # 执行MCP请求（支持tools/list和tools/call）
+OPTIONS /mcp          # CORS预检支持
 ```
+
+所有HTTP端点都包含CORS头，支持跨域请求。
 
 ### 示例请求
 
 #### 1. 健康检查
 ```bash
-curl http://localhost:7777/health
+curl http://localhost:8127/health
 # 响应: {"status":"ok"}
 ```
 
 #### 2. 获取工具列表
 ```bash
-curl http://localhost:7777/tools
+curl http://localhost:8127/tools
 # 响应: {"tools":[{工具信息}]}
 ```
 
 #### 3. 调用工具
 ```bash
-curl -X POST http://localhost:7777/mcp \
+curl -X POST http://localhost:8127/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "method": "tools/call",
@@ -138,7 +179,7 @@ HTTP transport也支持API过滤：
 config := mcp.DefaultConfig().
     WithSwaggerData(data).
     WithAPIConfig("https://api.example.com", "").
-    WithHTTPTransport(7777, "", "").
+    WithHTTPTransport(6724, "", "").
     WithExcludePaths("/admin/*").
     WithExcludeMethods("DELETE", "PATCH")
 

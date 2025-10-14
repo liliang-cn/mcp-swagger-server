@@ -32,7 +32,7 @@ func NewSwaggerMCPServerWithFilter(apiBaseURL string, swaggerSpec *spec.Swagger,
 	// Create MCP server with Implementation
 	implementation := &mcp.Implementation{
 		Name:    "swagger-mcp-server",
-		Version: "v0.1.0",
+		Version: "v1.0.0",
 	}
 
 	server := mcp.NewServer(implementation, nil)
@@ -64,15 +64,8 @@ func (s *SwaggerMCPServer) RunStdio(ctx context.Context) error {
 
 	log.Println("Starting MCP server from Swagger with stdio transport...")
 
-	// Connect and run the server
-	session, err := s.server.Connect(ctx, transport, nil)
-	if err != nil {
-		return fmt.Errorf("failed to connect MCP server: %w", err)
-	}
-
-	// Wait for the session to end
-	_ = session.Wait()
-	return nil
+	// Run the server directly using the new v1.0.0 API
+	return s.server.Run(ctx, transport)
 }
 
 // RunHTTP starts the MCP server with HTTP transport
@@ -157,21 +150,16 @@ func (s *SwaggerMCPServer) registerOperation(method, path string, op *spec.Opera
 		description = fmt.Sprintf("%s %s", method, path)
 	}
 
-	// Build parameters schema
-	schema := s.buildParametersSchema(op.Parameters)
-
-	// Create tool
+	// Create tool with basic info (input schema will be auto-generated)
 	tool := &mcp.Tool{
 		Name:        toolName,
 		Description: description,
-		InputSchema: schema,
+		InputSchema: s.buildParametersSchema(op.Parameters), // Keep manual schema for now
 	}
 
-	// Create handler function that wraps our logic
-	handler := s.createHandler(method, path, op)
-
-	// Register the tool
-	s.server.AddTool(tool, handler)
+	// Register the tool using the new generic AddTool function
+	// This provides automatic type validation and schema generation
+	mcp.AddTool(s.server, tool, s.createTypedHandler(method, path, op))
 }
 
 func (s *SwaggerMCPServer) buildParametersSchema(params []spec.Parameter) interface{} {
@@ -261,7 +249,148 @@ func (s *SwaggerMCPServer) buildParametersSchema(params []spec.Parameter) interf
 	return schema
 }
 
-// Create a handler function that works as a basic ToolHandler
+// APIRequest represents the input structure for API calls
+type APIRequest struct {
+	// Dynamic parameters based on the Swagger spec
+	// We use map[string]interface{} to handle various parameter types
+	Params map[string]interface{} `json:"_params,omitempty"`
+}
+
+// APIResponse represents the output structure for API calls
+type APIResponse struct {
+	Content string `json:"content" jsonschema:"The response content from the API call"`
+	Status  int    `json:"status,omitempty" jsonschema:"HTTP status code"`
+}
+
+// Create a typed handler function that works with the generic AddTool
+func (s *SwaggerMCPServer) createTypedHandler(method, path string, op *spec.Operation) mcp.ToolHandlerFor[map[string]interface{}, APIResponse] {
+	return func(ctx context.Context, req *mcp.CallToolRequest, args map[string]interface{}) (*mcp.CallToolResult, APIResponse, error) {
+		// Build URL with path parameters
+		url := s.apiBaseURL + path
+
+		// Extract body parameter if present
+		var bodyData interface{}
+		if body, exists := args["body"]; exists {
+			bodyData = body
+			delete(args, "body")
+		}
+
+		// Replace path parameters
+		for key, value := range args {
+			placeholder := "{" + key + "}"
+			if strings.Contains(url, placeholder) {
+				url = strings.ReplaceAll(url, placeholder, fmt.Sprintf("%v", value))
+				delete(args, key) // Remove from args since it's in the URL
+			}
+		}
+
+		// Prepare request
+		var body io.Reader
+		if method == "POST" || method == "PUT" || method == "PATCH" {
+			// Use body data if available, otherwise use remaining args
+			var dataToSend interface{}
+			if bodyData != nil {
+				dataToSend = bodyData
+			} else if len(args) > 0 {
+				dataToSend = args
+			}
+
+			if dataToSend != nil {
+				jsonData, err := json.Marshal(dataToSend)
+				if err != nil {
+					return nil, APIResponse{}, fmt.Errorf("failed to marshal request body: %w", err)
+				}
+				body = bytes.NewReader(jsonData)
+			}
+		} else {
+			// Add remaining args as query parameters
+			if len(args) > 0 {
+				queryParams := []string{}
+				for key, value := range args {
+					queryParams = append(queryParams, fmt.Sprintf("%s=%v", key, value))
+				}
+				if strings.Contains(url, "?") {
+					url += "&" + strings.Join(queryParams, "&")
+				} else {
+					url += "?" + strings.Join(queryParams, "&")
+				}
+			}
+		}
+
+		// Create HTTP request
+		httpReq, err := http.NewRequestWithContext(ctx, method, url, body)
+		if err != nil {
+			return nil, APIResponse{}, fmt.Errorf("failed to create request: %w", err)
+		}
+
+		// Set headers
+		if body != nil {
+			httpReq.Header.Set("Content-Type", "application/json")
+		}
+		httpReq.Header.Set("Accept", "application/json")
+
+		// Add API key if configured
+		if s.apiKey != "" {
+			// Try different common API key header formats
+			httpReq.Header.Set("X-API-Key", s.apiKey)
+			httpReq.Header.Set("Authorization", "Bearer "+s.apiKey)
+		}
+
+		// Execute request
+		client := &http.Client{}
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			return nil, APIResponse{}, fmt.Errorf("request failed: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		// Read response
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, APIResponse{}, fmt.Errorf("failed to read response: %w", err)
+		}
+
+		// Try to format JSON response
+		var jsonResponse interface{}
+		var content string
+		if err := json.Unmarshal(responseBody, &jsonResponse); err == nil {
+			// Successfully parsed as JSON, format it
+			formattedJSON, _ := json.MarshalIndent(jsonResponse, "", "  ")
+			content = string(formattedJSON)
+		} else {
+			// Return as plain text if not JSON
+			content = string(responseBody)
+		}
+
+		// Create response
+		apiResponse := APIResponse{
+			Content: content,
+			Status:  resp.StatusCode,
+		}
+
+		// Check status code and create appropriate MCP result
+		if resp.StatusCode >= 400 {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{
+						Text: fmt.Sprintf("API error %d: %s", resp.StatusCode, content),
+					},
+				},
+				IsError: true,
+			}, apiResponse, nil
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: content,
+				},
+			},
+		}, apiResponse, nil
+	}
+}
+
+// Create a handler function that works as a basic ToolHandler (legacy)
 func (s *SwaggerMCPServer) createHandler(method, path string, op *spec.Operation) mcp.ToolHandler {
 	return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		// Extract parameters from the request arguments
@@ -277,7 +406,7 @@ func (s *SwaggerMCPServer) createHandler(method, path string, op *spec.Operation
 
 		// Build URL with path parameters
 		url := s.apiBaseURL + path
-		
+
 		// Extract body parameter if present
 		var bodyData interface{}
 		if body, exists := params["body"]; exists {
@@ -304,7 +433,7 @@ func (s *SwaggerMCPServer) createHandler(method, path string, op *spec.Operation
 			} else if len(params) > 0 {
 				dataToSend = params
 			}
-			
+
 			if dataToSend != nil {
 				jsonData, err := json.Marshal(dataToSend)
 				if err != nil {
@@ -338,7 +467,7 @@ func (s *SwaggerMCPServer) createHandler(method, path string, op *spec.Operation
 			httpReq.Header.Set("Content-Type", "application/json")
 		}
 		httpReq.Header.Set("Accept", "application/json")
-		
+
 		// Add API key if configured
 		if s.apiKey != "" {
 			// Try different common API key header formats

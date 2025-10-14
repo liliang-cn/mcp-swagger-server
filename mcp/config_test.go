@@ -18,8 +18,8 @@ func TestDefaultConfig(t *testing.T) {
 	if config.Name != "swagger-mcp-server" {
 		t.Errorf("DefaultConfig() Name = %v, want %v", config.Name, "swagger-mcp-server")
 	}
-	if config.Version != "v0.2.0" {
-		t.Errorf("DefaultConfig() Version = %v, want %v", config.Version, "v0.2.0")
+	if config.Version != "v1.0.0" {
+		t.Errorf("DefaultConfig() Version = %v, want %v", config.Version, "v1.0.0")
 	}
 	if config.Description != "MCP server generated from Swagger/OpenAPI specification" {
 		t.Errorf("DefaultConfig() Description = %v, want %v", config.Description, "MCP server generated from Swagger/OpenAPI specification")

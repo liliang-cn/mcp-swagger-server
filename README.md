@@ -9,17 +9,28 @@ A Model Context Protocol (MCP) server that converts Swagger/OpenAPI specificatio
 
 > **Status**: ✅ Production Ready - The project is stable, well-tested, and ready for production use.
 
+> **📖 Documentation**: [中文文档](README_CN.md) | [English Documentation](README.md)
+
 ## Features
 
 - **Dual Usage**: Works as standalone CLI and Go library
-- **Multiple Transport**: Supports stdio and HTTP transport
+- **Multiple Transport**: Supports stdio and HTTP transport with CORS support
 - **Complete Swagger Support**: Loads Swagger 2.0 and OpenAPI specifications (JSON or YAML)
-- **Auto-conversion**: Automatically converts API endpoints to MCP tools
-- **API Filtering**: Advanced filtering to control which APIs become tools
+- **Auto-conversion**: Automatically converts API endpoints to MCP tools with proper schema generation
+- **Advanced API Filtering**: Comprehensive filtering system to control which APIs become tools
+  - Path-based filtering with wildcard support
+  - HTTP method filtering (GET, POST, PUT, DELETE, PATCH)
+  - Operation ID filtering
+  - Tag-based filtering
+  - Include-only (whitelist) mode
 - **Full HTTP Support**: Supports all HTTP methods (GET, POST, PUT, DELETE, PATCH)
-- **Parameter Handling**: Handles path parameters, query parameters, and request bodies
-- **Authentication**: Automatic API key authentication support
+- **Parameter Handling**: Intelligent handling of path parameters, query parameters, and request bodies
+- **Authentication**: Automatic API key authentication support with multiple header formats
 - **Web Integration**: Easy integration into existing Go web applications
+- **HTTP API Endpoints**: Built-in HTTP endpoints for tools listing and health checks
+- **Error Handling**: Comprehensive error handling with proper HTTP status codes
+- **JSON Formatting**: Automatic JSON response formatting and validation
+- **Server Configuration**: Flexible configuration system with fluent API
 
 ## Installation
 
@@ -79,6 +90,12 @@ go build -o mcp-swagger-server .
 ./mcp-swagger-server -swagger examples/api.json -api-key YOUR_API_KEY
 ```
 
+#### With HTTP transport:
+
+```bash
+./mcp-swagger-server -swagger examples/api.json -http-port 8127
+```
+
 #### With API filtering (exclude admin endpoints):
 
 ```bash
@@ -92,6 +109,15 @@ go build -o mcp-swagger-server .
   -exclude-methods "DELETE,PATCH" \
   -exclude-tags "admin,internal" \
   -exclude-paths "/debug/*"
+```
+
+#### With HTTP transport and filtering:
+
+```bash
+./mcp-swagger-server -swagger examples/api.json \
+  -http-port 8127 \
+  -exclude-methods "DELETE,PATCH" \
+  -exclude-paths "/admin/*"
 ```
 
 ### Go Library Usage
@@ -136,17 +162,17 @@ func main() {
     router := http.NewServeMux()
     
     // Create MCP server from your API swagger
-    mcpServer, _ := mcp.NewFromSwaggerFile("your-api.json", "http://localhost:6666", "")
-    
+    mcpServer, _ := mcp.NewFromSwaggerFile("your-api.json", "http://localhost:6724", "")
+
     // Option 1: Run MCP server on separate HTTP port
-    go mcpServer.RunHTTP(context.Background(), 7777)
+    go mcpServer.RunHTTP(context.Background(), 8127)
     
     // Option 2: Integrate into existing server (custom implementation needed)
     
     // Your existing routes
     router.HandleFunc("/api/users", handleUsers)
-    
-    http.ListenAndServe(":6666", router)
+
+    http.ListenAndServe(":6724", router)
 }
 ```
 
@@ -156,7 +182,7 @@ func main() {
 config := mcp.DefaultConfig().
     WithAPIConfig("https://api.example.com", "your-api-key").
     WithServerInfo("my-api-server", "v1.0.0", "Custom API MCP Server").
-    WithHTTPTransport(7777, "localhost", "/mcp")
+    WithHTTPTransport(8127, "localhost", "/mcp")
 
 server, err := mcp.New(config)
 if err != nil {
@@ -214,6 +240,11 @@ server, err := mcp.New(config)
 - `-api-base` - Override the base URL for API calls (defaults to spec's host)
 - `-api-key` - API key for authentication
 
+### Transport Options
+- `-http-port` - HTTP server port (default: 0 = use stdio transport)
+- `-http-host` - HTTP server host (default: localhost)
+- `-http-path` - HTTP server path for MCP endpoint (default: /mcp)
+
 ### API Filtering Options
 - `-exclude-paths` - Comma-separated list of paths to exclude (supports wildcards like `/admin/*`)
 - `-exclude-operations` - Comma-separated list of operation IDs to exclude
@@ -226,18 +257,21 @@ server, err := mcp.New(config)
 
 When running with HTTP transport, the server exposes the following endpoints:
 
-- `GET /health` - Health check endpoint
-- `GET /tools` - List available tools
-- `POST /mcp` - Execute MCP requests
+- `GET /health` - Health check endpoint with status information
+- `GET /tools` - List available tools with detailed information
+- `POST /mcp` - Execute MCP requests (supports tools/list and tools/call)
+- `OPTIONS /mcp` - CORS preflight support
+
+All HTTP endpoints include CORS headers for cross-origin requests.
 
 ### Example HTTP Usage
 
 ```bash
 # Get available tools
-curl http://localhost:7777/tools
+curl http://localhost:8127/tools
 
 # Execute a tool
-curl -X POST http://localhost:7777/mcp \
+curl -X POST http://localhost:8127/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "method": "tools/call",
