@@ -26,6 +26,7 @@ func main() {
 		httpPort            = flag.Int("http-port", 0, "HTTP server port (0 = disabled, use stdio transport)")
 		httpHost            = flag.String("http-host", "localhost", "HTTP server host")
 		httpPath            = flag.String("http-path", "/mcp", "HTTP server path for MCP endpoint")
+		checkStatus         = flag.Bool("check-status", false, "Load the spec, print status summary, and exit")
 	)
 
 	flag.Parse()
@@ -37,6 +38,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  -http-port: HTTP server port (default: 0 = use stdio)\n")
 		fmt.Fprintf(os.Stderr, "  -http-host: HTTP server host (default: localhost)\n")
 		fmt.Fprintf(os.Stderr, "  -http-path: HTTP server path (default: /mcp)\n")
+		fmt.Fprintf(os.Stderr, "\nOther options:\n")
+		fmt.Fprintf(os.Stderr, "  -check-status: Load the spec, print status summary, and exit\n")
 		fmt.Fprintf(os.Stderr, "\nFiltering options:\n")
 		fmt.Fprintf(os.Stderr, "  -exclude-paths: Comma-separated paths to exclude (supports wildcards)\n")
 		fmt.Fprintf(os.Stderr, "  -exclude-operations: Comma-separated operation IDs to exclude\n")
@@ -145,6 +148,17 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to create server from swagger URL: %v", err)
 		}
+	}
+
+	// If only checking status, print a summary and exit
+	if *checkStatus {
+		conf := server.GetConfig()
+		tools := server.ListTools()
+		fmt.Println("Status: OK")
+		fmt.Printf("Server: %s %s\n", conf.Name, conf.Version)
+		fmt.Printf("API Base: %s\n", conf.APIBaseURL)
+		fmt.Printf("Tools: %d\n", len(tools))
+		os.Exit(0)
 	}
 
 	// Run the server with appropriate transport

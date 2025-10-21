@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
+	"strings"
 
 	"github.com/go-openapi/spec"
 )
@@ -138,11 +140,33 @@ func (s *Server) GetConfig() *Config {
 	return s.config
 }
 
-// ListTools returns a list of available tools
+// ListTools returns a list of available tool names derived from the swagger spec and filters
 func (s *Server) ListTools() []string {
 	tools := []string{}
-	// This would need to be implemented by extending the underlying MCP server
-	// to expose its tools list
+	cfg := s.GetConfig()
+	if cfg == nil || cfg.SwaggerSpec == nil {
+		return tools
+	}
+
+	for path, pathItem := range cfg.SwaggerSpec.Paths.Paths {
+		if pathItem.Get != nil && !cfg.Filter.ShouldExcludeOperation("GET", path, pathItem.Get) {
+			tools = append(tools, toolNameFor("GET", path, pathItem.Get))
+		}
+		if pathItem.Post != nil && !cfg.Filter.ShouldExcludeOperation("POST", path, pathItem.Post) {
+			tools = append(tools, toolNameFor("POST", path, pathItem.Post))
+		}
+		if pathItem.Put != nil && !cfg.Filter.ShouldExcludeOperation("PUT", path, pathItem.Put) {
+			tools = append(tools, toolNameFor("PUT", path, pathItem.Put))
+		}
+		if pathItem.Delete != nil && !cfg.Filter.ShouldExcludeOperation("DELETE", path, pathItem.Delete) {
+			tools = append(tools, toolNameFor("DELETE", path, pathItem.Delete))
+		}
+		if pathItem.Patch != nil && !cfg.Filter.ShouldExcludeOperation("PATCH", path, pathItem.Patch) {
+			tools = append(tools, toolNameFor("PATCH", path, pathItem.Patch))
+		}
+	}
+
+	sort.Strings(tools)
 	return tools
 }
 
@@ -181,4 +205,18 @@ func inferBaseURL(swagger *spec.Swagger) string {
 		return fmt.Sprintf("%s://%s%s", scheme, swagger.Host, swagger.BasePath)
 	}
 	return ""
+}
+
+// toolNameFor generates a tool name from method/path/operation using the same logic as HTTP transport
+func toolNameFor(method, path string, op *spec.Operation) string {
+	if op != nil && op.ID != "" {
+		toolName := strings.ReplaceAll(op.ID, " ", "_")
+		return strings.ToLower(toolName)
+	}
+	toolName := strings.ToLower(method) + "_"
+	pathName := strings.ReplaceAll(path, "/", "_")
+	pathName = strings.ReplaceAll(pathName, "{", "")
+	pathName = strings.ReplaceAll(pathName, "}", "")
+	pathName = strings.TrimPrefix(pathName, "_")
+	return toolName + pathName
 }
