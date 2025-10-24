@@ -1,63 +1,112 @@
-# MCP Swagger Server 使用指南
+# MCP Swagger Server
+
+将 Swagger/OpenAPI 规范转换为 MCP 工具，支持 CLI 和 Go 库两种使用方式。
 
 > **📖 文档**: [中文文档](README_CN.md) | [English Documentation](README.md)
 
-## 功能特性概览
+## 🚀 快速开始
 
-MCP Swagger Server 提供了以下核心功能：
+### 1. 启动测试 API（终端 1）
 
-### 核心特性
-- **双模式支持**: 既可作为独立CLI工具，也可作为Go库集成
-- **多种传输方式**: 支持标准输入输出和HTTP传输，HTTP传输包含跨域资源共享支持
-- **完整的接口规范支持**: 支持Swagger 2.0和OpenAPI规范（JSON和YAML格式）
-- **自动转换**: 自动将应用程序接口端点转换为MCP工具，包含完整的模式生成
-- **高级接口过滤**: 全面的过滤系统，精确控制哪些接口成为工具
-- **完整超文本传输协议支持**: 支持所有HTTP方法（GET、POST、PUT、DELETE、PATCH）
-- **智能参数处理**: 智能处理路径参数、查询参数和请求体
-- **认证支持**: 自动应用程序接口密钥认证，支持多种头格式
-- **网络集成**: 轻松集成到现有Go网络应用程序
-- **超文本传输协议接口端点**: 内置HTTP端点用于工具列表和健康检查
-- **错误处理**: 完善的错误处理和适当的HTTP状态码
-- **JSON格式化**: 自动JSON响应格式化和验证
-- **灵活配置**: 灵活的配置系统和流畅的应用程序接口
+```bash
+cd examples/server && go run main.go
+# 运行在 http://localhost:4538
+```
 
-## 问题解答：MCP端点没有响应的原因
+### 2. 启动 MCP 服务器（终端 2）
 
-你遇到的问题是因为 **MCP 服务器有两种不同的传输方式 (transport)**：
+```bash
+# HTTP 模式（测试用）
+./mcp-swagger-server \
+  -swagger examples/server/swagger.json \
+  -api-base http://localhost:4538/v2 \
+  -http-port 4539
 
-1. **stdio transport** - 用于命令行工具和MCP客户端通信
-2. **HTTP transport** - 用于HTTP API和web集成
+# 测试
+curl http://localhost:4539/mcp/health
+```
 
-## 两种传输方式的区别
+### 3. Claude Desktop 配置
 
-### 1. stdio transport (默认)
-- 用于 Claude Desktop、其他MCP客户端
-- 通过标准输入/输出进行通信
-- 不能通过HTTP访问
+```json
+{
+  "mcpServers": {
+    "local-petstore": {
+      "command": "/path/to/mcp-swagger-server",
+      "args": [
+        "-swagger",
+        "/path/to/swagger.json",
+        "-api-base",
+        "http://localhost:4538/v2"
+      ]
+    }
+  }
+}
+```
 
-### 2. HTTP transport
-- 提供HTTP API端点
-- 可以用curl、浏览器、Postman等测试
-- 适合web应用集成
+**重要**: API base URL 必须包含 Swagger 的 `basePath`（如 `/v2`）
 
-## 如何使用HTTP transport
+## 功能特性
 
-### 方法1: 使用配置创建
+- **双模式**: CLI 工具 + Go 库
+- **双传输**: stdio（Claude Desktop）+ HTTP（测试/Web）
+- **完整支持**: Swagger 2.0/OpenAPI 规范
+- **API 过滤**: 路径/方法/标签过滤
+- **认证**: API Key 支持
+
+## 命令行使用
+
+```bash
+# Stdio 模式（Claude Desktop）
+./mcp-swagger-server -swagger api.json -api-base https://api.example.com
+
+# HTTP 模式（测试）
+./mcp-swagger-server -swagger api.json -api-base https://api.example.com -http-port 4539
+
+# API 过滤
+./mcp-swagger-server -swagger api.json \
+  -exclude-methods "DELETE,PATCH" \
+  -exclude-paths "/admin/*"
+```
+
+## HTTP 端点
+
+所有端点在 `/mcp` 路径下：
+
+- `GET /mcp/health` - 健康检查
+- `GET /mcp/tools` - 工具列表
+- `POST /mcp` - MCP 协议
+
+## Go 库使用
 
 ```go
+server, _ := mcp.NewFromSwaggerFile("api.json", "https://api.example.com", "api-key")
+server.RunStdio(context.Background())
+```
+
+## 常见问题
+
+**Q: 404 错误**  
+A: 检查 API base URL 是否包含 Swagger 的 `basePath`
+
+**Q: 连接失败**  
+A: 确保 API 服务器运行中
+
+**Q: 工具列表为空**  
+A: 检查 Swagger 文件路径和格式
 package main
 
 import (
-    "context"
-    "github.com/liliang-cn/mcp-swagger-server/mcp"
+"context"
+"github.com/liliang-cn/mcp-swagger-server/mcp"
 )
 
 func main() {
-    // 创建配置
-    config := mcp.DefaultConfig().
-        WithSwaggerFile("api.json").
-        WithAPIConfig("https://api.example.com", "your-api-key").
-        WithHTTPTransport(8127, "localhost", "/mcp")
+// 创建配置
+config := mcp.DefaultConfig().
+WithSwaggerFile("api.json").
+WithAPIConfig("https://api.example.com", "your-api-key").
+WithHTTPTransport(8127, "localhost", "/mcp")
 
     // 创建服务器
     server, err := mcp.New(config)
@@ -68,10 +117,12 @@ func main() {
     // 启动服务器 (自动使用HTTP transport)
     ctx := context.Background()
     server.Run(ctx)
-}
-```
 
-### 方法2: 直接使用RunHTTP
+}
+
+````
+
+### 方法 2: 直接使用 RunHTTP
 
 ```go
 package main
@@ -92,11 +143,11 @@ func main() {
     ctx := context.Background()
     server.RunHTTP(ctx, 6724)
 }
-```
+````
 
-### 方法3: 命令行启动HTTP服务器
+### 方法 3: 命令行启动 HTTP 服务器
 
-现在命令行工具原生支持HTTP transport：
+现在命令行工具原生支持 HTTP transport：
 
 ```bash
 # 启动HTTP服务器
@@ -117,30 +168,58 @@ func main() {
 
 ## HTTP API 端点
 
-当使用HTTP transport时，服务器提供以下端点：
+当使用 HTTP transport 时，服务器提供以下端点（所有端点都在配置的路径下，默认 `/mcp`）：
 
 ```bash
-GET  /health          # 健康检查，返回状态信息
-GET  /tools           # 获取可用工具列表，包含详细信息
+GET  /mcp/health      # 健康检查，返回服务器状态信息
+GET  /mcp/tools       # 获取可用工具列表，包含详细信息
 POST /mcp             # 执行MCP请求（支持tools/list和tools/call）
 OPTIONS /mcp          # CORS预检支持
 ```
 
-所有HTTP端点都包含CORS头，支持跨域请求。
+所有 HTTP 端点都包含 CORS 头，支持跨域请求。
 
 ### 示例请求
 
 #### 1. 健康检查
+
 ```bash
-curl http://localhost:8127/health
-# 响应: {"status":"ok"}
+curl http://localhost:4539/mcp/health
+# 响应: {"status":"ok","server":"swagger-mcp-server","version":"v1.0.0"}
 ```
 
 #### 2. 获取工具列表
+
 ```bash
-curl http://localhost:8127/tools
+curl http://localhost:4539/mcp/tools
 # 响应: {"tools":[{工具信息}]}
 ```
+
+#### 3. 调用工具
+
+```bash
+curl -X POST http://localhost:4539/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "tools/call",
+    "params": {
+      "name": "listpets",
+      "arguments": {"limit": 5}
+    },
+    "id": 1
+  }'
+```
+
+**重要提示：**
+
+- 如果 Swagger 文件中定义了 `basePath`（如 `/v2`），API base URL 必须包含它
+- 示例：`-api-base http://localhost:4538/v2` 而不是 `http://localhost:4538`
+  curl http://localhost:8127/tools
+
+# 响应: {"tools":[{工具信息}]}
+
+````
 
 #### 3. 调用工具
 ```bash
@@ -155,25 +234,26 @@ curl -X POST http://localhost:8127/mcp \
       }
     }
   }'
-```
+````
 
 ## 完整示例
 
-运行HTTP transport示例：
+运行 HTTP transport 示例：
 
 ```bash
 go run examples/http_server/main.go
 ```
 
 这个示例会：
-1. 启动两个HTTP服务器 (端口7777和8888)
+
+1. 启动两个 HTTP 服务器 (端口 7777 和 8888)
 2. 使用 JSONPlaceholder API 作为后端
-3. 测试所有HTTP端点
+3. 测试所有 HTTP 端点
 4. 展示正确的使用方式
 
-## API过滤在HTTP transport中的使用
+## API 过滤在 HTTP transport 中的使用
 
-HTTP transport也支持API过滤：
+HTTP transport 也支持 API 过滤：
 
 ```go
 config := mcp.DefaultConfig().
@@ -186,44 +266,50 @@ config := mcp.DefaultConfig().
 server, _ := mcp.New(config)
 ```
 
-过滤的API不会出现在 `/tools` 端点中，也无法通过 `/mcp` 调用。
+过滤的 API 不会出现在 `/tools` 端点中，也无法通过 `/mcp` 调用。
 
 ## 选择合适的传输方式
 
 ### 使用 stdio transport 当：
-- 与Claude Desktop集成
-- 与其他MCP客户端集成
+
+- 与 Claude Desktop 集成
+- 与其他 MCP 客户端集成
 - 作为命令行工具使用
 
 ### 使用 HTTP transport 当：
-- 构建web应用
-- 需要HTTP API
-- 与现有HTTP服务集成
+
+- 构建 web 应用
+- 需要 HTTP API
+- 与现有 HTTP 服务集成
 - 进行开发和测试
 
 ## 故障排除
 
-### 问题1: "MCP端点没有响应"
-**原因**: 使用了stdio transport但试图通过HTTP访问  
-**解决**: 使用HTTP transport或通过MCP客户端访问
+### 问题 1: "MCP 端点没有响应"
 
-### 问题2: "404 Not Found"
+**原因**: 使用了 stdio transport 但试图通过 HTTP 访问  
+**解决**: 使用 HTTP transport 或通过 MCP 客户端访问
+
+### 问题 2: "404 Not Found"
+
 **原因**: 端点路径错误  
 **解决**: 确保使用正确的端点 (`/health`, `/tools`, `/mcp`)
 
-### 问题3: "Connection refused"
+### 问题 3: "Connection refused"
+
 **原因**: 服务器未启动或端口错误  
 **解决**: 确认服务器正在运行并使用正确端口
 
-### 问题4: "工具调用失败"
-**原因**: API过滤、认证问题或后端API不可达  
-**解决**: 检查过滤配置、API密钥和网络连接
+### 问题 4: "工具调用失败"
+
+**原因**: API 过滤、认证问题或后端 API 不可达  
+**解决**: 检查过滤配置、API 密钥和网络连接
 
 ## 开发建议
 
-1. **开发时使用HTTP transport** - 便于测试和调试
-2. **生产时根据需求选择** - MCP客户端用stdio，web应用用HTTP
-3. **使用API过滤增强安全性** - 避免暴露敏感端点
+1. **开发时使用 HTTP transport** - 便于测试和调试
+2. **生产时根据需求选择** - MCP 客户端用 stdio，web 应用用 HTTP
+3. **使用 API 过滤增强安全性** - 避免暴露敏感端点
 4. **监控健康检查端点** - 用于负载均衡和监控
 
 ## 下一步

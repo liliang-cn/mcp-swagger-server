@@ -10,7 +10,7 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
-	
+
 	if config == nil {
 		t.Error("DefaultConfig() returned nil")
 		return
@@ -47,9 +47,9 @@ func TestConfig_WithSwaggerSpec(t *testing.T) {
 			},
 		},
 	}
-	
+
 	result := config.WithSwaggerSpec(swagger)
-	
+
 	if result != config {
 		t.Error("WithSwaggerSpec() should return the same config instance")
 	}
@@ -61,9 +61,9 @@ func TestConfig_WithSwaggerSpec(t *testing.T) {
 func TestConfig_WithSwaggerData(t *testing.T) {
 	config := DefaultConfig()
 	data := []byte(`{"swagger": "2.0", "info": {"title": "Test", "version": "1.0.0"}}`)
-	
+
 	result := config.WithSwaggerData(data)
-	
+
 	if result != config {
 		t.Error("WithSwaggerData() should return the same config instance")
 	}
@@ -76,9 +76,9 @@ func TestConfig_WithAPIConfig(t *testing.T) {
 	config := DefaultConfig()
 	baseURL := "https://api.example.com"
 	apiKey := "test-key"
-	
+
 	result := config.WithAPIConfig(baseURL, apiKey)
-	
+
 	if result != config {
 		t.Error("WithAPIConfig() should return the same config instance")
 	}
@@ -93,13 +93,13 @@ func TestConfig_WithAPIConfig(t *testing.T) {
 func TestConfig_WithTransport(t *testing.T) {
 	config := DefaultConfig()
 	transport := &HTTPTransport{
-		Port: 8080,
+		Port: 4538,
 		Host: "localhost",
 		Path: "/test",
 	}
-	
+
 	result := config.WithTransport(transport)
-	
+
 	if result != config {
 		t.Error("WithTransport() should return the same config instance")
 	}
@@ -113,9 +113,9 @@ func TestConfig_WithServerInfo(t *testing.T) {
 	name := "test-server"
 	version := "v2.0.0"
 	description := "Test server description"
-	
+
 	result := config.WithServerInfo(name, version, description)
-	
+
 	if result != config {
 		t.Error("WithServerInfo() should return the same config instance")
 	}
@@ -132,16 +132,16 @@ func TestConfig_WithServerInfo(t *testing.T) {
 
 func TestConfig_WithHTTPTransport(t *testing.T) {
 	config := DefaultConfig()
-	port := 9090
+	port := 4539
 	host := "test.com"
 	path := "/mcp"
-	
+
 	result := config.WithHTTPTransport(port, host, path)
-	
+
 	if result != config {
 		t.Error("WithHTTPTransport() should return the same config instance")
 	}
-	
+
 	httpTransport, ok := config.Transport.(*HTTPTransport)
 	if !ok {
 		t.Error("WithHTTPTransport() did not set HTTPTransport")
@@ -159,20 +159,20 @@ func TestConfig_WithHTTPTransport(t *testing.T) {
 
 func TestStdioTransport_Connect(t *testing.T) {
 	transport := &StdioTransport{}
-	
+
 	// Create a mock server for testing
 	implementation := &mcp.Implementation{
 		Name:    "test-server",
 		Version: "v1.0.0",
 	}
 	server := mcp.NewServer(implementation, nil)
-	
+
 	ctx := context.Background()
-	
+
 	// This will try to connect via stdio, which may not work in tests
 	// but we can test that it doesn't panic and returns some result
 	session, err := transport.Connect(ctx, server)
-	
+
 	// The actual connection might fail in test environment, that's OK
 	// We're just testing the method exists and doesn't panic
 	_ = session
@@ -181,24 +181,24 @@ func TestStdioTransport_Connect(t *testing.T) {
 
 func TestHTTPTransport_Connect(t *testing.T) {
 	transport := &HTTPTransport{
-		Port: 8080,
+		Port: 4538,
 		Host: "localhost",
 		Path: "/mcp",
 	}
-	
+
 	// Create a mock server for testing
 	implementation := &mcp.Implementation{
 		Name:    "test-server",
 		Version: "v1.0.0",
 	}
 	server := mcp.NewServer(implementation, nil)
-	
+
 	ctx := context.Background()
-	
+
 	// This will try to connect via stdio (fallback), which may not work in tests
 	// but we can test that it doesn't panic and returns some result
 	session, err := transport.Connect(ctx, server)
-	
+
 	// The actual connection might fail in test environment, that's OK
 	// We're just testing the method exists and doesn't panic
 	_ = session
@@ -220,13 +220,13 @@ func TestConfig_ChainedMethods(t *testing.T) {
 			},
 		},
 	}
-	
+
 	config := DefaultConfig().
 		WithSwaggerSpec(swagger).
 		WithAPIConfig("https://api.example.com", "test-key").
 		WithServerInfo("custom-server", "v2.0.0", "Custom description").
-		WithHTTPTransport(9090, "custom.com", "/custom")
-	
+		WithHTTPTransport(4539, "custom.com", "/custom")
+
 	if config.SwaggerSpec != swagger {
 		t.Error("Chained methods: SwaggerSpec not set correctly")
 	}
@@ -245,12 +245,12 @@ func TestConfig_ChainedMethods(t *testing.T) {
 	if config.Description != "Custom description" {
 		t.Error("Chained methods: Description not set correctly")
 	}
-	
+
 	httpTransport, ok := config.Transport.(*HTTPTransport)
 	if !ok {
 		t.Error("Chained methods: Transport is not HTTPTransport")
 	}
-	if httpTransport.Port != 9090 {
+	if httpTransport.Port != 4539 {
 		t.Error("Chained methods: HTTPTransport Port not set correctly")
 	}
 	if httpTransport.Host != "custom.com" {

@@ -21,12 +21,12 @@ if ! go list github.com/gorilla/mux &> /dev/null; then
     go get github.com/gorilla/mux
 fi
 
-echo "Starting server on port 8080..."
+echo "Starting server on port 4538..."
 echo "Press Ctrl+C to stop the server"
 echo ""
 echo "Once started, you can test with:"
-echo "  curl http://localhost:8080/health"
-echo "  curl http://localhost:8080/v2/pets"
+echo "  curl http://localhost:4538/health"
+echo "  curl http://localhost:4538/v2/pets"
 echo ""
 
 # Start the server

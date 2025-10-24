@@ -8,7 +8,7 @@
       "name": "Local Development"
     }
   },
-  "host": "localhost:8080",
+  "host": "localhost:4538",
   "basePath": "/v2",
   "schemes": ["http"],
   "paths": {
