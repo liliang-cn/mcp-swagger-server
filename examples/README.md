@@ -34,7 +34,8 @@ cd examples/server
 ./start_server.sh
 ```
 
-The server will start on `http://localhost:8080` with the following endpoints:
+The server will start on `http://localhost:4538` with the following endpoints:
+
 - `GET /health` - Health check
 - `GET /v2/pets` - List pets
 - `POST /v2/pets` - Create pet
@@ -48,6 +49,7 @@ The server will start on `http://localhost:8080` with the following endpoints:
 Each example demonstrates different aspects of the MCP Swagger Server:
 
 #### Example 1: Basic Stdio Transport
+
 ```bash
 cd examples/01_basic_stdio
 go run main.go
@@ -56,6 +58,7 @@ go run main.go
 Shows basic usage with stdio transport, ideal for CLI tools and MCP clients.
 
 #### Example 2: HTTP Transport
+
 ```bash
 cd examples/02_http_transport
 go run main.go
@@ -64,6 +67,7 @@ go run main.go
 Demonstrates HTTP transport with REST API endpoints, ideal for web applications.
 
 #### Example 3: API Filtering
+
 ```bash
 cd examples/03_api_filtering
 go run main.go
@@ -72,6 +76,7 @@ go run main.go
 Shows how to filter which API operations are exposed as MCP tools.
 
 #### Example 4: Advanced Usage
+
 ```bash
 cd examples/04_advanced_usage
 go run main.go
@@ -80,6 +85,7 @@ go run main.go
 Demonstrates advanced configuration, error handling, and tool inspection.
 
 #### Example 5: Testing Demo
+
 ```bash
 cd examples/05_testing_demo
 go run main.go
@@ -94,12 +100,14 @@ Comprehensive testing of all MCP server functionality with detailed results.
 **Purpose**: Learn the fundamentals of MCP server setup with stdio transport
 
 **Features**:
+
 - Basic server configuration
 - Loading Swagger from local file
 - Stdio transport setup
 - Tool listing and information
 
 **Use Cases**:
+
 - CLI tool integration
 - MCP client integration (Claude Desktop, etc.)
 - Session-based communication
@@ -109,12 +117,14 @@ Comprehensive testing of all MCP server functionality with detailed results.
 **Purpose**: Learn how to use HTTP transport for web applications
 
 **Features**:
+
 - HTTP transport configuration
 - REST API endpoints (`/health`, `/tools`, `/mcp`)
 - Endpoint testing
 - HTTP client examples
 
 **Use Cases**:
+
 - Web applications
 - HTTP-based clients
 - Multi-client scenarios
@@ -125,12 +135,14 @@ Comprehensive testing of all MCP server functionality with detailed results.
 **Purpose**: Learn how to control which API operations are exposed
 
 **Features**:
+
 - Include/exclude HTTP methods
 - Tag-based filtering
 - Combined filtering strategies
 - Security considerations
 
 **Use Cases**:
+
 - Security hardening
 - Client-specific toolsets
 - Read-only access patterns
@@ -141,6 +153,7 @@ Comprehensive testing of all MCP server functionality with detailed results.
 **Purpose**: Learn advanced patterns and best practices
 
 **Features**:
+
 - Custom server configuration
 - Tool schema inspection
 - Error handling patterns
@@ -148,6 +161,7 @@ Comprehensive testing of all MCP server functionality with detailed results.
 - Performance considerations
 
 **Use Cases**:
+
 - Production deployments
 - Custom integrations
 - Debugging and monitoring
@@ -158,6 +172,7 @@ Comprehensive testing of all MCP server functionality with detailed results.
 **Purpose**: Learn how to test MCP server functionality
 
 **Features**:
+
 - Comprehensive test suite
 - Performance testing
 - Error scenario testing
@@ -165,6 +180,7 @@ Comprehensive testing of all MCP server functionality with detailed results.
 - Automated validation
 
 **Use Cases**:
+
 - CI/CD integration
 - Quality assurance
 - Regression testing
@@ -175,6 +191,7 @@ Comprehensive testing of all MCP server functionality with detailed results.
 All examples support common configuration patterns:
 
 ### Basic Configuration
+
 ```go
 config := mcp.DefaultConfig().
     WithServerInfo("name", "version", "description").
@@ -183,6 +200,7 @@ config := mcp.DefaultConfig().
 ```
 
 ### Transport Configuration
+
 ```go
 // Stdio (default)
 server.RunStdio(ctx)
@@ -193,6 +211,7 @@ server.Run(ctx)
 ```
 
 ### Filtering Configuration
+
 ```go
 // Exclude methods
 config.WithExcludeMethods("DELETE", "PUT")
@@ -222,16 +241,19 @@ config.WithExcludeTags("admin", "internal")
 ## 🐛 Troubleshooting
 
 **Server won't start**:
-- Check if ports 8080 or 7777-7780 are already in use
+
+- Check if ports 4538 or 7777-7780 are already in use
 - Ensure Go dependencies are installed
 - Verify you're in the correct directory
 
 **API calls fail**:
+
 - Make sure the local API server is running
 - Check server startup logs for errors
 - Verify the API base URL is correct
 
 **MCP tools not working**:
+
 - Check Swagger file is correctly formatted
 - Verify API endpoints are accessible
 - Review server configuration logs

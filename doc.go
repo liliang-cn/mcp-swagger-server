@@ -44,9 +44,9 @@
 //
 //	mcp-swagger-server -swagger api.json -api-key YOUR_API_KEY
 //
-// Override base URL:
+// Override base URL (include basePath if defined in Swagger):
 //
-//	mcp-swagger-server -swagger api.yaml -api-base https://api.production.com
+//	mcp-swagger-server -swagger api.yaml -api-base https://api.example.com/v2
 //
 // With HTTP transport:
 //
@@ -63,15 +63,17 @@
 //	-swagger-url string
 //	    URL to fetch Swagger/OpenAPI specification from
 //	-api-base string
-//	    Override base URL for API requests (optional)
+//	    Override base URL for API requests (must include basePath from Swagger if defined)
 //	-api-key string
 //	    API key for authentication (optional)
 //	-http-port int
 //	    HTTP server port (default: 0 = use stdio transport)
+//	    Example: -http-port 4539
 //	-http-host string
 //	    HTTP server host (default: localhost)
 //	-http-path string
 //	    HTTP server path for MCP endpoint (default: /mcp)
+//	    All endpoints will be under this path: /mcp/health, /mcp/tools, /mcp
 //	-exclude-paths string
 //	    Comma-separated paths to exclude (supports wildcards)
 //	-exclude-operations string
