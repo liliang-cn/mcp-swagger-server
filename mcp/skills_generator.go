@@ -228,7 +228,7 @@ func (sg *SkillsGenerator) generateReferenceMD(tag string, operations []Operatio
 		if op.Spec.Responses != nil && len(op.Spec.Responses.StatusCodeResponses) > 0 {
 			sb.WriteString("### Responses\n\n")
 			for code, response := range op.Spec.Responses.StatusCodeResponses {
-				sb.WriteString(fmt.Sprintf("#### %s\n", code))
+				sb.WriteString(fmt.Sprintf("#### %d\n", code))
 				if response.Description != "" {
 					sb.WriteString(fmt.Sprintf("%s\n\n", response.Description))
 				}

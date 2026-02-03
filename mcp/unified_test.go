@@ -109,15 +109,11 @@ func TestGenerateToolDescription(t *testing.T) {
 // TestAPIExecutor verifies the API executor can be created
 func TestAPIExecutor(t *testing.T) {
     executor := NewAPIExecutor("https://api.example.com", "test-key")
-    
-    if executor == nil {
-        t.Fatal("Expected non-nil executor")
-    }
-    
+
     if executor.APIBaseURL != "https://api.example.com" {
         t.Errorf("Expected base URL to be https://api.example.com, got %s", executor.APIBaseURL)
     }
-    
+
     if executor.APIKey != "test-key" {
         t.Errorf("Expected API key to be test-key, got %s", executor.APIKey)
     }

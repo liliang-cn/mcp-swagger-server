@@ -106,17 +106,12 @@ func (s *SwaggerMCPServer) GetSkillsMetadata() *SkillsMetadata {
     skills := make([]Skill, 0, len(tagGroups))
     for tag, operations := range tagGroups {
         operationNames := make([]string, len(operations))
-        descriptions := make([]string, 0, len(operations))
 
         for i, op := range operations {
             if op.Spec.ID != "" {
                 operationNames[i] = op.Spec.ID
             } else {
                 operationNames[i] = GenerateToolName(op.Method, op.Path, op.Spec)
-            }
-
-            if op.Spec.Summary != "" {
-                descriptions = append(descriptions, op.Spec.Summary)
             }
         }
 
@@ -406,48 +401,6 @@ func (s *SwaggerMCPServer) createTypedHandler(method, path string, op *spec.Oper
                 },
             },
         }, apiResponse, nil
-    }
-}
-
-// Create a handler function that works as a basic ToolHandler (legacy)
-func (s *SwaggerMCPServer) createHandler(method, path string, op *spec.Operation) mcp.ToolHandler {
-    return func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-        // Extract parameters from the request arguments
-        var params map[string]interface{}
-        if req.Params.Arguments != nil {
-            if err := json.Unmarshal(req.Params.Arguments, &params); err != nil {
-                return nil, fmt.Errorf("failed to parse arguments: %w", err)
-            }
-        }
-        if params == nil {
-            params = make(map[string]interface{})
-        }
-
-        // Use the shared API executor
-        content, statusCode, err := s.apiExecutor.BuildAndExecuteRequest(ctx, method, path, params)
-        if err != nil {
-            return nil, err
-        }
-
-        // Check status code
-        if statusCode >= 400 {
-            return &mcp.CallToolResult{
-                Content: []mcp.Content{
-                    &mcp.TextContent{
-                        Text: fmt.Sprintf("API error %d: %s", statusCode, content),
-                    },
-                },
-                IsError: true,
-            }, nil
-        }
-
-        return &mcp.CallToolResult{
-            Content: []mcp.Content{
-                &mcp.TextContent{
-                    Text: content,
-                },
-            },
-        }, nil
     }
 }
 
