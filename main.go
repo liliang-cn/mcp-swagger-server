@@ -26,13 +26,14 @@ func main() {
 		httpPort            = flag.Int("http-port", 0, "HTTP server port (0 = disabled, use stdio transport)")
 		httpHost            = flag.String("http-host", "localhost", "HTTP server host")
 		httpPath            = flag.String("http-path", "/mcp", "HTTP server path for MCP endpoint")
+		skillsDir           = flag.String("skills-dir", "", "Generate Agent Skills to this directory instead of running MCP server")
 	)
 
 	flag.Parse()
 
 	// Validate inputs
 	if *swaggerFile == "" && *swaggerURL == "" {
-		fmt.Fprintf(os.Stderr, "Usage: %s -swagger <file> | -swagger-url <url> [-api-base <url>] [-api-key <key>] [transport options] [filtering options]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s -swagger <file> | -swagger-url <url> [-api-base <url>] [-api-key <key>] [transport options] [filtering options] [skills options]\n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "\nTransport options:\n")
 		fmt.Fprintf(os.Stderr, "  -http-port: HTTP server port (default: 0 = use stdio)\n")
 		fmt.Fprintf(os.Stderr, "  -http-host: HTTP server host (default: localhost)\n")
@@ -44,6 +45,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  -exclude-tags: Comma-separated tags to exclude\n")
 		fmt.Fprintf(os.Stderr, "  -include-only-paths: Include only these paths (exclusive)\n")
 		fmt.Fprintf(os.Stderr, "  -include-only-operations: Include only these operation IDs (exclusive)\n")
+		fmt.Fprintf(os.Stderr, "\nSkills options:\n")
+		fmt.Fprintf(os.Stderr, "  -skills-dir: Generate Agent Skills to this directory (SKILL.md files) instead of running MCP server\n")
 		os.Exit(1)
 	}
 
@@ -147,13 +150,31 @@ func main() {
 		}
 	}
 
+	// Generate Skills if -skills-dir is specified
+	if *skillsDir != "" {
+		log.Printf("Generating Agent Skills to directory: %s", *skillsDir)
+		mcpServer := server.GetMCPServer()
+		if err := mcpServer.GenerateSkills(*skillsDir); err != nil {
+			log.Fatalf("Failed to generate skills: %v", err)
+		}
+
+		// Also output skills metadata as JSON
+		metadata, err := mcpServer.GetSkillsMetadataJSON()
+		if err != nil {
+			log.Fatalf("Failed to generate skills metadata: %v", err)
+		}
+		fmt.Println("\nSkills Metadata (JSON):")
+		fmt.Println(metadata)
+		log.Printf("Successfully generated %d skills to %s", len(mcpServer.GetSkillsMetadata().Skills), *skillsDir)
+		return
+	}
+
 	// Run the server with appropriate transport
 	ctx := context.Background()
 	
 	if *httpPort > 0 {
 		// Use HTTP transport
-		config := server.GetConfig()
-		config.WithHTTPTransport(*httpPort, *httpHost, *httpPath)
+		server.GetConfig().WithHTTPTransport(*httpPort, *httpHost, *httpPath)
 		log.Printf("Starting MCP server with HTTP transport on %s:%d%s", *httpHost, *httpPort, *httpPath)
 		if err := server.RunHTTP(ctx, *httpPort); err != nil {
 			log.Fatalf("Server error: %v", err)

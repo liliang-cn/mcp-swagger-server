@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/go-openapi/spec v0.22.0
-	github.com/modelcontextprotocol/go-sdk v1.0.0
+	github.com/modelcontextprotocol/go-sdk v1.3.0-pre.1
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -18,8 +18,8 @@ require (
 	github.com/go-openapi/swag/stringutils v0.25.1 // indirect
 	github.com/go-openapi/swag/typeutils v0.25.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.25.1 // indirect
-	github.com/google/jsonschema-go v0.3.0 // indirect
-	github.com/gorilla/mux v1.8.1 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 )

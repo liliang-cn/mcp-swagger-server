@@ -138,6 +138,11 @@ func (s *Server) GetConfig() *Config {
 	return s.config
 }
 
+// GenerateSkills generates Agent Skills to the specified directory
+func (s *Server) GenerateSkills(outputDir string) error {
+	return s.mcp.GenerateSkills(outputDir)
+}
+
 // ListTools returns a list of available tools
 func (s *Server) ListTools() []string {
 	tools := []string{}

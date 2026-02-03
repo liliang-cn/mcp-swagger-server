@@ -12,6 +12,19 @@ import (
     "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// Skill represents an Agent Skill metadata
+type Skill struct {
+    Name        string   `json:"name"`
+    Description string   `json:"description"`
+    Tag         string   `json:"tag"`
+    Operations  []string `json:"operations"`
+}
+
+// SkillsMetadata holds all skills metadata
+type SkillsMetadata struct {
+    Skills []Skill `json:"skills"`
+}
+
 type SwaggerMCPServer struct {
     server      *mcp.Server
     apiBaseURL  string
@@ -84,6 +97,121 @@ func (s *SwaggerMCPServer) RunHTTP(addr string) error {
 // GetServer returns the underlying MCP server (useful for custom transport implementations)
 func (s *SwaggerMCPServer) GetServer() *mcp.Server {
     return s.server
+}
+
+// GetSkillsMetadata returns skills metadata for all API operations
+func (s *SwaggerMCPServer) GetSkillsMetadata() *SkillsMetadata {
+    tagGroups := s.groupOperationsByTag()
+
+    skills := make([]Skill, 0, len(tagGroups))
+    for tag, operations := range tagGroups {
+        operationNames := make([]string, len(operations))
+        descriptions := make([]string, 0, len(operations))
+
+        for i, op := range operations {
+            if op.Spec.ID != "" {
+                operationNames[i] = op.Spec.ID
+            } else {
+                operationNames[i] = GenerateToolName(op.Method, op.Path, op.Spec)
+            }
+
+            if op.Spec.Summary != "" {
+                descriptions = append(descriptions, op.Spec.Summary)
+            }
+        }
+
+        description := s.generateSkillDescription(tag, operations)
+
+        skills = append(skills, Skill{
+            Name:        toTitleCase(tag),
+            Description: description,
+            Tag:         tag,
+            Operations:  operationNames,
+        })
+    }
+
+    return &SkillsMetadata{Skills: skills}
+}
+
+// GetSkillsMetadataJSON returns skills metadata as JSON
+func (s *SwaggerMCPServer) GetSkillsMetadataJSON() (string, error) {
+    metadata := s.GetSkillsMetadata()
+    data, err := json.MarshalIndent(metadata, "", "  ")
+    if err != nil {
+        return "", err
+    }
+    return string(data), nil
+}
+
+// groupOperationsByTag groups operations by their tags
+func (s *SwaggerMCPServer) groupOperationsByTag() map[string][]Operation {
+    groups := make(map[string][]Operation)
+
+    for path, pathItem := range s.swagger.Paths.Paths {
+        operations := []struct {
+            method string
+            op     *spec.Operation
+        }{
+            {"GET", pathItem.Get},
+            {"POST", pathItem.Post},
+            {"PUT", pathItem.Put},
+            {"DELETE", pathItem.Delete},
+            {"PATCH", pathItem.Patch},
+        }
+
+        for _, op := range operations {
+            if op.op == nil {
+                continue
+            }
+
+            // Get tags - default to "default" if no tags
+            tags := op.op.Tags
+            if len(tags) == 0 {
+                tags = []string{"default"}
+            }
+
+            for _, tag := range tags {
+                // Clean tag name
+                cleanTag := sanitizeName(tag)
+                groups[cleanTag] = append(groups[cleanTag], Operation{
+                    Method: op.method,
+                    Path:   path,
+                    Spec:   op.op,
+                    Tag:    tag,
+                })
+            }
+        }
+    }
+
+    return groups
+}
+
+// generateSkillDescription creates a description for a skill
+func (s *SwaggerMCPServer) generateSkillDescription(tag string, operations []Operation) string {
+    if len(operations) == 0 {
+        return fmt.Sprintf("API operations for %s", tag)
+    }
+
+    var summaries []string
+    for _, op := range operations {
+        if op.Spec.Summary != "" {
+            summaries = append(summaries, op.Spec.Summary)
+        } else if op.Spec.ID != "" {
+            summaries = append(summaries, op.Spec.ID)
+        }
+    }
+
+    if len(summaries) > 0 && len(summaries) <= 3 {
+        return fmt.Sprintf("Provides %s", joinWithComma(summaries))
+    }
+
+    return fmt.Sprintf("API operations for %s (%d endpoints)", tag, len(operations))
+}
+
+// GenerateSkills generates Agent Skills files to the specified directory
+func (s *SwaggerMCPServer) GenerateSkills(outputDir string) error {
+    generator := NewSkillsGenerator(s.swagger, s.apiBaseURL, outputDir)
+    return generator.Generate()
 }
 
 // RegisterTools creates MCP tools from Swagger endpoints
@@ -337,5 +465,49 @@ func getJSONType(swaggerType string) string {
         return "object"
     default:
         return "string"
+    }
+}
+
+// Helper functions for Skills generation (shared with skills_generator.go)
+
+// sanitizeName cleans a tag name for use as directory name
+func sanitizeName(name string) string {
+    name = strings.ToLower(name)
+    name = strings.Map(func(r rune) rune {
+        if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
+            return r
+        }
+        return '-'
+    }, name)
+    return name
+}
+
+// toTitleCase converts a string to title case
+func toTitleCase(s string) string {
+    if s == "" {
+        return "API"
+    }
+    words := strings.Split(s, "-_-/")
+    for i, w := range words {
+        if w != "" {
+            if len(w) > 0 {
+               	words[i] = strings.ToUpper(w[:1]) + strings.ToLower(w[1:])
+            }
+        }
+    }
+    return strings.Join(words, " ")
+}
+
+// joinWithComma joins strings with commas
+func joinWithComma(items []string) string {
+    switch len(items) {
+    case 0:
+        return ""
+    case 1:
+        return items[0]
+    case 2:
+        return items[0] + " and " + items[1]
+    default:
+        return strings.Join(items[:len(items)-1], ", ") + ", and " + items[len(items)-1]
     }
 }
