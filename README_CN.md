@@ -49,10 +49,11 @@ curl http://localhost:4539/mcp/health
 ## 功能特性
 
 - **双模式**: CLI 工具 + Go 库
-- **双传输**: stdio（Claude Desktop）+ HTTP（测试/Web）
+- **双传输**: stdio（Claude Desktop）+ 标准 MCP Streamable HTTP
 - **完整支持**: Swagger 2.0/OpenAPI 规范
 - **API 过滤**: 路径/方法/标签过滤
 - **认证**: API Key 支持
+- **Agent Skills 生成**: 从 Swagger 生成符合 [agentskills.io](https://agentskills.io) 规范的 SKILL.md
 
 ## 命令行使用
 
@@ -67,15 +68,27 @@ curl http://localhost:4539/mcp/health
 ./mcp-swagger-server -swagger api.json \
   -exclude-methods "DELETE,PATCH" \
   -exclude-paths "/admin/*"
+
+# 生成 Agent Skills（不启动服务器）
+./mcp-swagger-server -swagger api.json -skills-dir ./.claude/skills
 ```
 
 ## HTTP 端点
 
 所有端点在 `/mcp` 路径下：
 
+- `POST /mcp` - 标准 MCP Streamable HTTP 协议端点
 - `GET /mcp/health` - 健康检查
-- `GET /mcp/tools` - 工具列表
-- `POST /mcp` - MCP 协议
+- `GET /mcp/tools` - 工具列表（REST 便捷端点）
+
+HTTP 模式下标准 MCP 客户端可直连：
+
+```bash
+claude mcp add my-api --transport http http://localhost:4539/mcp
+```
+
+> **注意**: 自 v1.2.0 起 `/mcp` 端点使用标准 MCP Streamable HTTP 协议，
+> 旧的非标准 JSON 格式（无 JSON-RPC 框架的 `{"method": "tools/call"}`）不再支持。
 
 ## Go 库使用
 

@@ -14,7 +14,8 @@ A Model Context Protocol (MCP) server that converts Swagger/OpenAPI specificatio
 ## Features
 
 - **Dual Usage**: Works as standalone CLI and Go library
-- **Multiple Transport**: Supports stdio and HTTP transport with CORS support
+- **Multiple Transport**: stdio and standard MCP Streamable HTTP transport with CORS support
+- **Agent Skills Generation**: Generate [agentskills.io](https://agentskills.io)-compliant SKILL.md files from any swagger spec
 - **Complete Swagger Support**: Loads Swagger 2.0 and OpenAPI specifications (JSON or YAML)
 - **Auto-conversion**: Automatically converts API endpoints to MCP tools with proper schema generation
 - **Advanced API Filtering**: Comprehensive filtering system to control which APIs become tools
@@ -69,7 +70,7 @@ go build -o mcp-swagger-server .
 #### From a local Swagger file:
 
 ```bash
-./mcp-swagger-server -swagger examples/petstore.json
+./mcp-swagger-server -swagger examples/server/swagger.json
 ```
 
 #### From a URL:
@@ -253,49 +254,78 @@ server, err := mcp.New(config)
 - `-include-only-paths` - Comma-separated list of paths to include exclusively (whitelist mode)
 - `-include-only-operations` - Comma-separated list of operation IDs to include exclusively
 
+### Skills Options
+- `-skills-dir` - Generate [Agent Skills](https://agentskills.io) to this directory instead of running the MCP server
+
+## Agent Skills Generation
+
+Instead of running an MCP server, you can generate Agent Skills (SKILL.md files)
+from the swagger spec. Operations are grouped by tag, one skill per tag:
+
+```bash
+./mcp-swagger-server -swagger api.json -skills-dir ./.claude/skills
+```
+
+This produces a directory layout conforming to the
+[Agent Skills specification](https://agentskills.io/specification):
+
+```
+.claude/skills/
+├── INDEX.md            # Overview of all generated skills
+├── pets/
+│   ├── SKILL.md        # Skill metadata + tool usage instructions
+│   └── reference.md    # Detailed API reference for this tag
+└── ...
+```
+
 ## HTTP API Endpoints
 
 When running with HTTP transport, the server exposes the following endpoints:
 
-- `GET /health` - Health check endpoint with status information
-- `GET /tools` - List available tools with detailed information
-- `POST /mcp` - Execute MCP requests (supports tools/list and tools/call)
-- `OPTIONS /mcp` - CORS preflight support
+- `POST /mcp` - Standard [MCP Streamable HTTP](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#streamable-http) endpoint; any standard MCP client can connect
+- `GET /mcp/health` - Health check endpoint with status information
+- `GET /mcp/tools` - List available tools with detailed information (REST convenience endpoint)
 
 All HTTP endpoints include CORS headers for cross-origin requests.
 
 ### Example HTTP Usage
 
 ```bash
-# Get available tools
-curl http://localhost:8127/tools
+# Connect with a standard MCP client (e.g. Claude Code)
+claude mcp add my-api --transport http http://localhost:8127/mcp
 
-# Execute a tool
-curl -X POST http://localhost:8127/mcp \
-  -H "Content-Type: application/json" \
-  -d '{
-    "method": "tools/call",
-    "params": {
-      "name": "get_users",
-      "arguments": {
-        "limit": 10
-      }
-    }
-  }'
+# Health check
+curl http://localhost:8127/mcp/health
+
+# List available tools (REST)
+curl http://localhost:8127/mcp/tools
 ```
+
+Or connect programmatically with the official Go SDK:
+
+```go
+client := mcp.NewClient(&mcp.Implementation{Name: "my-client", Version: "1.0"}, nil)
+session, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+    Endpoint: "http://localhost:8127/mcp",
+}, nil)
+```
+
+> **Note:** Since v1.2.0 the `/mcp` endpoint speaks the standard MCP Streamable
+> HTTP protocol. The previous non-standard `POST /mcp` JSON format
+> (`{"method": "tools/call", ...}` without JSON-RPC framing) is no longer supported.
 
 ## Examples
 
 ### Example Swagger Spec
 
-The `examples/petstore.json` file contains a sample Swagger specification for testing.
+The `examples/server/swagger.json` file contains a sample Swagger specification for testing, and `examples/server` contains a runnable petstore backend that implements it.
 
 ### API Filtering Example
 
 Run the API filtering example to see how different filtering options work:
 
 ```bash
-go run examples/api_filtering/main.go
+go run examples/03_api_filtering/main.go
 ```
 
 This example demonstrates:
