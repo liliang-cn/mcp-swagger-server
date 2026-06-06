@@ -12,36 +12,46 @@ import (
     "gopkg.in/yaml.v3"
 )
 
-// ParseSwaggerSpec parses a Swagger/OpenAPI spec from JSON or YAML
+// ParseSwaggerSpec parses a Swagger 2.0 or OpenAPI 3.x spec from JSON or
+// YAML. OpenAPI 3.x documents are converted to Swagger 2.0 internally, and
+// all $refs are expanded so downstream schema generation sees full schemas.
 func ParseSwaggerSpec(data []byte) (*spec.Swagger, error) {
-    var swagger spec.Swagger
+    jsonData := data
 
-    // Try JSON first
-    err := json.Unmarshal(data, &swagger)
-    if err == nil {
-        return &swagger, nil
-    }
-
-    // Try YAML - first convert to map then to JSON
-    var yamlData map[string]interface{}
-    err = yaml.Unmarshal(data, &yamlData)
-    if err == nil {
-        // Convert YAML to JSON
-        jsonData, err := json.Marshal(yamlData)
+    // Normalize YAML input to JSON first
+    if !json.Valid(data) {
+        var yamlData map[string]interface{}
+        if err := yaml.Unmarshal(data, &yamlData); err != nil {
+            return nil, fmt.Errorf("failed to parse spec as JSON or YAML")
+        }
+        converted, err := json.Marshal(yamlData)
         if err != nil {
             return nil, fmt.Errorf("failed to convert YAML to JSON: %w", err)
         }
-        
-        // Parse with go-openapi/spec
-        swagger = spec.Swagger{}
-        if err := json.Unmarshal(jsonData, &swagger); err != nil {
-            return nil, fmt.Errorf("failed to parse converted spec: %w", err)
-        }
-        
-        return &swagger, nil
+        jsonData = converted
     }
 
-    return nil, fmt.Errorf("failed to parse spec as JSON or YAML")
+    // Convert OpenAPI 3.x documents to Swagger 2.0
+    if isOpenAPI3(jsonData) {
+        converted, err := convertOpenAPI3ToSwagger2(jsonData)
+        if err != nil {
+            return nil, err
+        }
+        jsonData = converted
+    }
+
+    var swagger spec.Swagger
+    if err := json.Unmarshal(jsonData, &swagger); err != nil {
+        return nil, fmt.Errorf("failed to parse spec: %w", err)
+    }
+
+    // Expand $refs (e.g. body schemas referencing #/definitions) so tool
+    // input schemas include the full field list instead of a bare object.
+    if err := spec.ExpandSpec(&swagger, nil); err != nil {
+        return nil, fmt.Errorf("failed to expand spec refs: %w", err)
+    }
+
+    return &swagger, nil
 }
 
 // FetchSwaggerFromURL downloads a Swagger/OpenAPI spec from a URL

@@ -282,31 +282,20 @@ func (s *SwaggerMCPServer) buildParametersSchema(params []spec.Parameter) interf
 
         // Create parameter schema based on type
         paramSchema := make(map[string]interface{})
-        
+
         if param.Type != "" {
             paramSchema["type"] = getJSONType(param.Type)
         } else if param.Schema != nil {
-            // Handle body parameters with schema
-            if len(param.Schema.Type) > 0 {
-                paramSchema["type"] = param.Schema.Type[0]
+            // Body parameters carry a full JSON schema (already $ref-expanded
+            // by ParseSwaggerSpec). Serialize it as-is so nested objects,
+            // arrays, required lists and descriptions all survive.
+            if full := schemaToMap(param.Schema); full != nil {
+                paramSchema = full
             } else {
                 paramSchema["type"] = "object"
             }
-            
-            // Add properties if available
-            if param.Schema.Properties != nil {
-                props := make(map[string]interface{})
-                for name, prop := range param.Schema.Properties {
-                    propSchema := make(map[string]interface{})
-                    if len(prop.Type) > 0 {
-                        propSchema["type"] = prop.Type[0]
-                    }
-                    if prop.Description != "" {
-                        propSchema["description"] = prop.Description
-                    }
-                    props[name] = propSchema
-                }
-                paramSchema["properties"] = props
+            if _, ok := paramSchema["type"]; !ok {
+                paramSchema["type"] = "object"
             }
         }
 
@@ -402,6 +391,20 @@ func (s *SwaggerMCPServer) createTypedHandler(method, path string, op *spec.Oper
             },
         }, apiResponse, nil
     }
+}
+
+// schemaToMap serializes a spec.Schema into a generic JSON-schema map.
+// Returns nil if the schema cannot be serialized.
+func schemaToMap(schema *spec.Schema) map[string]interface{} {
+    data, err := json.Marshal(schema)
+    if err != nil {
+        return nil
+    }
+    var m map[string]interface{}
+    if err := json.Unmarshal(data, &m); err != nil {
+        return nil
+    }
+    return m
 }
 
 func getJSONType(swaggerType string) string {
