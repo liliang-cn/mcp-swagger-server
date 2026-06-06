@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 
 	"github.com/go-openapi/spec"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // HTTPServer wraps the MCP server for HTTP transport
@@ -63,8 +63,12 @@ func (h *HTTPServer) Start(ctx context.Context) error {
 		basePath += "/"
 	}
 
-	// MCP endpoint - exact match
-	mux.HandleFunc(h.path, corsHandler(h.handleMCPRequest))
+	// MCP endpoint - official MCP Streamable HTTP handler so that standard
+	// MCP clients (e.g. `claude mcp add --transport http`) can connect.
+	streamableHandler := sdk.NewStreamableHTTPHandler(func(req *http.Request) *sdk.Server {
+		return h.server.GetMCPServer().GetServer()
+	}, nil)
+	mux.HandleFunc(h.path, corsHandler(streamableHandler.ServeHTTP))
 
 	// Health check endpoint
 	mux.HandleFunc(basePath+"health", corsHandler(func(w http.ResponseWriter, r *http.Request) {
@@ -105,53 +109,6 @@ func (h *HTTPServer) Start(ctx context.Context) error {
 	return nil
 }
 
-// handleMCPRequest handles MCP requests over HTTP
-func (h *HTTPServer) handleMCPRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Only POST method allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Read request body
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "Failed to read request body", http.StatusBadRequest)
-		return
-	}
-
-	// Parse MCP request
-	var mcpRequest struct {
-		Method string                 `json:"method"`
-		Params map[string]interface{} `json:"params"`
-	}
-
-	if err := json.Unmarshal(body, &mcpRequest); err != nil {
-		http.Error(w, "Invalid JSON request", http.StatusBadRequest)
-		return
-	}
-
-	// Handle different MCP methods
-	var response interface{}
-	var httpStatus = http.StatusOK
-
-	switch mcpRequest.Method {
-	case "tools/list":
-		response = h.handleToolsListMCP()
-	case "tools/call":
-		response, httpStatus = h.handleToolCallMCP(mcpRequest.Params)
-	default:
-		response = map[string]string{"error": "Unknown method: " + mcpRequest.Method}
-		httpStatus = http.StatusBadRequest
-	}
-
-	// Send response
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(httpStatus)
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		log.Printf("Failed to encode MCP response: %v", err)
-	}
-}
-
 // handleToolsList handles GET /tools endpoint
 func (h *HTTPServer) handleToolsList(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -166,84 +123,6 @@ func (h *HTTPServer) handleToolsList(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		log.Printf("Failed to encode tools response: %v", err)
 	}
-}
-
-// handleToolsListMCP returns tools list in MCP format
-func (h *HTTPServer) handleToolsListMCP() interface{} {
-	tools := h.getAvailableTools()
-	return map[string]interface{}{
-		"tools": tools,
-	}
-}
-
-// handleToolCallMCP handles tool calls in MCP format
-func (h *HTTPServer) handleToolCallMCP(params map[string]interface{}) (interface{}, int) {
-	// Extract tool name and arguments
-	toolName, ok := params["name"].(string)
-	if !ok {
-		return map[string]string{"error": "Missing or invalid tool name"}, http.StatusBadRequest
-	}
-
-	arguments, ok := params["arguments"].(map[string]interface{})
-	if !ok {
-		arguments = make(map[string]interface{})
-	}
-
-	// Get the underlying MCP server and execute the tool directly
-	mcpServer := h.server.GetMCPServer()
-	if mcpServer == nil {
-		return map[string]string{"error": "MCP server not available"}, http.StatusInternalServerError
-	}
-
-	// Execute the API call directly using the same logic as the MCP server
-	result, err := h.executeAPICall(toolName, arguments)
-	if err != nil {
-		return map[string]string{"error": err.Error()}, http.StatusInternalServerError
-	}
-
-	return result, http.StatusOK
-}
-
-// executeAPICall executes an API call based on tool name and arguments
-func (h *HTTPServer) executeAPICall(toolName string, arguments map[string]interface{}) (interface{}, error) {
-	config := h.server.GetConfig()
-	if config.SwaggerSpec == nil {
-		return nil, fmt.Errorf("swagger specification not available")
-	}
-
-	// Find the operation for this tool using shared utility
-	method, path, operation := FindOperationByToolName(toolName, config.SwaggerSpec, config.Filter)
-	if operation == nil {
-		return nil, fmt.Errorf("tool not found: %s", toolName)
-	}
-
-	// Use shared API executor
-	executor := NewAPIExecutor(config.APIBaseURL, config.APIKey)
-	content, statusCode, err := executor.BuildAndExecuteRequest(context.Background(), method, path, arguments)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check status code
-	if statusCode >= 400 {
-		return map[string]interface{}{
-			"error":   true,
-			"status":  statusCode,
-			"message": content,
-		}, nil
-	}
-
-	// Try to parse JSON response
-	var jsonResponse interface{}
-	if err := json.Unmarshal([]byte(content), &jsonResponse); err == nil {
-		return jsonResponse, nil
-	}
-
-	// Return as plain text if not JSON
-	return map[string]interface{}{
-		"content": content,
-		"type":    "text",
-	}, nil
 }
 
 // getToolName generates tool name using shared utility

@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net/http"
 	"os"
-	"strings"
 	"time"
+
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/liliang-cn/mcp-swagger-server/mcp"
 )
@@ -28,7 +28,7 @@ func main() {
 	fmt.Println("-----------------------------------------")
 	config := mcp.DefaultConfig().
 		WithServerInfo("advanced-petstore", "2.0.0", "Advanced Petstore MCP Server with custom settings").
-		WithAPIConfig("http://localhost:4538", "").
+		WithAPIConfig("http://localhost:4538/v2", "").
 		WithSwaggerData(data).
 		WithExcludeMethods("DELETE"). // No destructive operations
 		WithHTTPTransport(8127, "localhost", "/mcp")
@@ -54,7 +54,7 @@ func main() {
 	// Give server time to start
 	time.Sleep(2 * time.Second)
 
-	// Example 2: Testing MCP tools via HTTP
+	// Example 2: Testing MCP tools with a standard MCP client
 	fmt.Println("\n🧪 Example 2: Testing MCP Tools")
 	fmt.Println("-------------------------------")
 	testMCPTools()
@@ -63,30 +63,23 @@ func main() {
 	fmt.Println("\n📋 Example 3: Tool Information")
 	fmt.Println("-----------------------------")
 	fmt.Println("Tools are dynamically generated from swagger specification:")
-	fmt.Println("   • listPets - List all pets with optional filtering")
-	fmt.Println("   • createPet - Create a new pet")
-	fmt.Println("   • getPetById - Get a specific pet by ID")
-	fmt.Println("   • updatePet - Update an existing pet")
-	fmt.Println("   • deletePet - Delete a pet")
-	fmt.Println("   • searchPets - Search pets by criteria")
+	fmt.Println("   • listpets - List all pets with optional filtering")
+	fmt.Println("   • createpet - Create a new pet")
+	fmt.Println("   • getpetbyid - Get a specific pet by ID")
+	fmt.Println("   • updatepet - Update an existing pet (excluded: PUT allowed, DELETE filtered)")
+	fmt.Println("   • searchpets - Search pets by criteria")
 	fmt.Println()
 	fmt.Println("Each tool's input schema is automatically generated from swagger parameters")
 
-	// Example 4: Error handling demonstration
-	fmt.Println("⚠️  Example 4: Error Handling")
-	fmt.Println("-----------------------------")
-	demonstrateErrorHandling()
-
 	fmt.Println("\n🚀 Advanced Features Demonstrated:")
 	fmt.Println("   • Custom server configuration")
-	fmt.Println("   • HTTP transport setup")
-	fmt.Println("   • Tool schema inspection")
+	fmt.Println("   • HTTP transport setup (standard MCP Streamable HTTP)")
+	fmt.Println("   • API filtering (DELETE operations excluded)")
 	fmt.Println("   • Error handling patterns")
-	fmt.Println("   • MCP protocol via HTTP")
 	fmt.Println()
 	fmt.Println("⚠️  Make sure the local API server is running:")
 	fmt.Println("   cd ../server && ./start_server.sh")
-	fmt.Println("\n🔧 Server is running on http://localhost:8127")
+	fmt.Println("\n🔧 Server is running on http://localhost:8127/mcp")
 	fmt.Println("Press Ctrl+C to exit.")
 
 	select {}
@@ -97,149 +90,73 @@ func readSwaggerFile(filePath string) ([]byte, error) {
 }
 
 func testMCPTools() {
-	baseURL := "http://localhost:8127"
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Connect with the official MCP client over Streamable HTTP
+	client := sdk.NewClient(&sdk.Implementation{Name: "advanced-example-client", Version: "1.0"}, nil)
+	session, err := client.Connect(ctx, &sdk.StreamableClientTransport{
+		Endpoint: "http://localhost:8127/mcp",
+	}, nil)
+	if err != nil {
+		fmt.Printf("   ❌ Failed to connect: %v\n", err)
+		return
+	}
+	defer func() { _ = session.Close() }()
 
 	// Test tools list
 	fmt.Println("   Testing tools/list...")
-	resp, err := http.Post(baseURL+"/mcp", "application/json",
-		strings.NewReader(`{"method": "tools/list", "params": {}}`))
+	tools, err := session.ListTools(ctx, nil)
 	if err != nil {
-		fmt.Printf("   ❌ Error: %v\n", err)
+		fmt.Printf("   ❌ tools/list failed: %v\n", err)
 		return
 	}
-	defer resp.Body.Close()
+	fmt.Printf("   ✅ tools/list successful (%d tools, DELETE operations excluded)\n", len(tools.Tools))
 
-	if resp.StatusCode == 200 {
-		fmt.Println("   ✅ tools/list successful")
+	// Test listpets tool
+	fmt.Println("   Testing listpets tool...")
+	result, err := session.CallTool(ctx, &sdk.CallToolParams{
+		Name:      "listpets",
+		Arguments: map[string]any{"limit": 3},
+	})
+	if err != nil || result.IsError {
+		fmt.Printf("   ❌ listpets failed: err=%v isError=%v\n", err, result != nil && result.IsError)
 	} else {
-		fmt.Printf("   ❌ tools/list failed: %d\n", resp.StatusCode)
+		fmt.Println("   ✅ listpets tool called successfully")
 	}
 
-	// Test listPets tool
-	fmt.Println("   Testing listPets tool...")
-	listPetsReq := `{
-		"method": "tools/call",
-		"params": {
-			"name": "listPets",
-			"arguments": {"limit": 3}
-		}
-	}`
-
-	resp, err = http.Post(baseURL+"/mcp", "application/json",
-		strings.NewReader(listPetsReq))
-	if err != nil {
-		fmt.Printf("   ❌ Error calling listPets: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 {
-		fmt.Println("   ✅ listPets tool called successfully")
+	// Test getpetbyid tool
+	fmt.Println("   Testing getpetbyid tool...")
+	result, err = session.CallTool(ctx, &sdk.CallToolParams{
+		Name:      "getpetbyid",
+		Arguments: map[string]any{"petId": 1},
+	})
+	if err != nil || result.IsError {
+		fmt.Printf("   ❌ getpetbyid failed: err=%v isError=%v\n", err, result != nil && result.IsError)
 	} else {
-		fmt.Printf("   ❌ listPets tool failed: %d\n", resp.StatusCode)
+		fmt.Println("   ✅ getpetbyid tool called successfully")
 	}
 
-	// Test getPetById tool
-	fmt.Println("   Testing getPetById tool...")
-	getPetReq := `{
-		"method": "tools/call",
-		"params": {
-			"name": "getPetById",
-			"arguments": {"petId": 1}
-		}
-	}`
-
-	resp, err = http.Post(baseURL+"/mcp", "application/json",
-		strings.NewReader(getPetReq))
-	if err != nil {
-		fmt.Printf("   ❌ Error calling getPetById: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 {
-		fmt.Println("   ✅ getPetById tool called successfully")
+	// Test searchpets tool
+	fmt.Println("   Testing searchpets tool...")
+	result, err = session.CallTool(ctx, &sdk.CallToolParams{
+		Name:      "searchpets",
+		Arguments: map[string]any{"body": map[string]any{"name": "Bud", "tag": "dog"}},
+	})
+	if err != nil || result.IsError {
+		fmt.Printf("   ❌ searchpets failed: err=%v isError=%v\n", err, result != nil && result.IsError)
 	} else {
-		fmt.Printf("   ❌ getPetById tool failed: %d\n", resp.StatusCode)
+		fmt.Println("   ✅ searchpets tool called successfully")
 	}
 
-	// Test searchPets tool
-	fmt.Println("   Testing searchPets tool...")
-	searchReq := `{
-		"method": "tools/call",
-		"params": {
-			"name": "searchPets",
-			"arguments": {"name": "Bud", "tag": "dog"}
-		}
-	}`
-
-	resp, err = http.Post(baseURL+"/mcp", "application/json",
-		strings.NewReader(searchReq))
-	if err != nil {
-		fmt.Printf("   ❌ Error calling searchPets: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode == 200 {
-		fmt.Println("   ✅ searchPets tool called successfully")
-	} else {
-		fmt.Printf("   ❌ searchPets tool failed: %d\n", resp.StatusCode)
-	}
-
-	fmt.Println("   ✅ All tool tests completed")
-}
-
-func demonstrateErrorHandling() {
-	baseURL := "http://localhost:8127"
-
-	// Test invalid tool name
+	// Error handling: invalid tool name
 	fmt.Println("   Testing invalid tool name...")
-	invalidReq := `{
-		"method": "tools/call",
-		"params": {
-			"name": "invalidTool",
-			"arguments": {}
-		}
-	}`
-
-	resp, err := http.Post(baseURL+"/mcp", "application/json",
-		strings.NewReader(invalidReq))
+	_, err = session.CallTool(ctx, &sdk.CallToolParams{Name: "invalidTool"})
 	if err != nil {
-		fmt.Printf("   ❌ Error: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		fmt.Printf("   ✅ Invalid tool correctly rejected: %d\n", resp.StatusCode)
+		fmt.Printf("   ✅ Invalid tool correctly rejected: %v\n", err)
 	} else {
 		fmt.Println("   ❌ Invalid tool should have been rejected")
 	}
 
-	// Test missing required arguments
-	fmt.Println("   Testing missing required arguments...")
-	missingArgsReq := `{
-		"method": "tools/call",
-		"params": {
-			"name": "createPet",
-			"arguments": {}
-		}
-	}`
-
-	resp, err = http.Post(baseURL+"/mcp", "application/json",
-		strings.NewReader(missingArgsReq))
-	if err != nil {
-		fmt.Printf("   ❌ Error: %v\n", err)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		fmt.Printf("   ✅ Missing arguments correctly rejected: %d\n", resp.StatusCode)
-	} else {
-		fmt.Println("   ❌ Missing arguments should have been rejected")
-	}
-
-	fmt.Println("   ✅ Error handling tests completed")
+	fmt.Println("   ✅ All tool tests completed")
 }

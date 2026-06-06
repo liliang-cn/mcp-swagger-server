@@ -423,15 +423,30 @@ func getJSONType(swaggerType string) string {
 
 // Helper functions for Skills generation (shared with skills_generator.go)
 
-// sanitizeName cleans a tag name for use as directory name
+// sanitizeName cleans a tag name into a valid Agent Skills name per
+// https://agentskills.io/specification: 1-64 chars, lowercase a-z0-9 and
+// hyphens only, no leading/trailing/consecutive hyphens.
 func sanitizeName(name string) string {
     name = strings.ToLower(name)
     name = strings.Map(func(r rune) rune {
-        if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '-' || r == '_' {
+        if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
             return r
         }
         return '-'
     }, name)
+
+    // Collapse consecutive hyphens and trim leading/trailing ones
+    for strings.Contains(name, "--") {
+        name = strings.ReplaceAll(name, "--", "-")
+    }
+    name = strings.Trim(name, "-")
+
+    if name == "" {
+        return "default"
+    }
+    if len(name) > 64 {
+        name = strings.Trim(name[:64], "-")
+    }
     return name
 }
 

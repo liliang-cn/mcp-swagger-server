@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-openapi/spec"
+	"gopkg.in/yaml.v3"
 )
 
 // SkillsGenerator converts Swagger specifications to Agent Skills format
@@ -130,15 +131,21 @@ func (sg *SkillsGenerator) generateSkillForTag(tag string, operations []Operatio
 
 // generateSkillMD creates the SKILL.md content
 func (sg *SkillsGenerator) generateSkillMD(tag string, operations []Operation) string {
-	name := toTitleCase(tag)
+	// The frontmatter name must match the skill directory name exactly and
+	// follow the Agent Skills naming rules (lowercase a-z0-9 + hyphens).
+	name := sanitizeName(tag)
 	description := sg.generateDescription(tag, operations)
 
 	var sb strings.Builder
 
-	// YAML frontmatter (required)
+	// YAML frontmatter (required). Marshal through a YAML encoder so values
+	// containing special characters (e.g. ': ') are always quoted correctly.
+	frontmatter, _ := yaml.Marshal(struct {
+		Name        string `yaml:"name"`
+		Description string `yaml:"description"`
+	}{Name: name, Description: description})
 	sb.WriteString("---\n")
-	sb.WriteString(fmt.Sprintf("name: %s\n", name))
-	sb.WriteString(fmt.Sprintf("description: %s\n", description))
+	sb.Write(frontmatter)
 	sb.WriteString("---\n\n")
 
 	// Skill introduction
@@ -149,9 +156,8 @@ func (sg *SkillsGenerator) generateSkillMD(tag string, operations []Operation) s
 	sb.WriteString("## When to use this skill\n\n")
 	sb.WriteString("Use this skill when you need to:\n")
 	for _, op := range operations {
-		if op.Spec.ID != "" {
-			sb.WriteString(fmt.Sprintf("- **%s**: %s\n", op.Spec.ID, getSummary(op.Spec)))
-		}
+		// Use the actual MCP tool name so agents can match it directly
+		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", op.ToolName, getSummary(op.Spec)))
 	}
 	sb.WriteString("\n")
 
@@ -264,10 +270,12 @@ func (sg *SkillsGenerator) generateSkillsIndex(tagGroups map[string][]Operation)
 	return os.WriteFile(filepath.Join(sg.outputDir, "INDEX.md"), []byte(sb.String()), 0644)
 }
 
-// generateDescription creates a description for a tag group
+// generateDescription creates a description for a tag group. Per the Agent
+// Skills spec it should say both what the skill does and when to use it,
+// with trigger keywords agents can match on.
 func (sg *SkillsGenerator) generateDescription(tag string, operations []Operation) string {
 	if len(operations) == 0 {
-		return fmt.Sprintf("API operations for %s", tag)
+		return fmt.Sprintf("API operations for %s. Use when working with the %s API.", tag, tag)
 	}
 
 	// Create description from operations
@@ -280,11 +288,22 @@ func (sg *SkillsGenerator) generateDescription(tag string, operations []Operatio
 		}
 	}
 
+	whenToUse := fmt.Sprintf("Use when the user wants to interact with the %s API", tag)
+
 	if len(methods) > 0 && len(methods) <= 3 {
-		return fmt.Sprintf("Provides %s", joinWithComma(methods))
+		return fmt.Sprintf("Provides %s. %s.", joinWithComma(methods), whenToUse)
 	}
 
-	return fmt.Sprintf("API operations for %s (%d endpoints)", tag, len(operations))
+	summary := fmt.Sprintf("API operations for %s (%d endpoints)", tag, len(operations))
+	if len(methods) > 0 {
+		// Include a few operation summaries as trigger keywords
+		max := 3
+		if len(methods) < max {
+			max = len(methods)
+		}
+		return fmt.Sprintf("%s: %s, and more. %s.", summary, joinWithComma(methods[:max]), whenToUse)
+	}
+	return fmt.Sprintf("%s. %s.", summary, whenToUse)
 }
 
 // Helper functions
