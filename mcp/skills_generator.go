@@ -149,34 +149,34 @@ func (sg *SkillsGenerator) generateSkillMD(tag string, operations []Operation) s
 	sb.WriteString("---\n\n")
 
 	// Skill introduction
-	sb.WriteString(fmt.Sprintf("# %s API Skill\n\n", name))
-	sb.WriteString(fmt.Sprintf("This skill provides tools for interacting with the %s API.\n\n", tag))
+	fmt.Fprintf(&sb, "# %s API Skill\n\n", name)
+	fmt.Fprintf(&sb, "This skill provides tools for interacting with the %s API.\n\n", tag)
 
 	// When to use this skill
 	sb.WriteString("## When to use this skill\n\n")
 	sb.WriteString("Use this skill when you need to:\n")
 	for _, op := range operations {
 		// Use the actual MCP tool name so agents can match it directly
-		sb.WriteString(fmt.Sprintf("- **%s**: %s\n", op.ToolName, getSummary(op.Spec)))
+		fmt.Fprintf(&sb, "- **%s**: %s\n", op.ToolName, getSummary(op.Spec))
 	}
 	sb.WriteString("\n")
 
 	// Available tools
 	sb.WriteString("## Available Tools\n\n")
 	for _, op := range operations {
-		sb.WriteString(fmt.Sprintf("### %s\n", op.ToolName))
-		sb.WriteString(fmt.Sprintf("**%s %s**\n\n", op.Method, op.Path))
+		fmt.Fprintf(&sb, "### %s\n", op.ToolName)
+		fmt.Fprintf(&sb, "**%s %s**\n\n", op.Method, op.Path)
 		if op.Spec.Description != "" {
-			sb.WriteString(fmt.Sprintf("%s\n\n", op.Spec.Description))
+			fmt.Fprintf(&sb, "%s\n\n", op.Spec.Description)
 		} else if op.Spec.Summary != "" {
-			sb.WriteString(fmt.Sprintf("%s\n\n", op.Spec.Summary))
+			fmt.Fprintf(&sb, "%s\n\n", op.Spec.Summary)
 		}
 	}
 
 	// Authentication
 	if sg.apiBaseURL != "" {
 		sb.WriteString("## Configuration\n\n")
-		sb.WriteString(fmt.Sprintf("- **Base URL**: `%s`\n", sg.apiBaseURL))
+		fmt.Fprintf(&sb, "- **Base URL**: `%s`\n", sg.apiBaseURL)
 		sb.WriteString("\n")
 	}
 
@@ -195,19 +195,19 @@ func (sg *SkillsGenerator) generateSkillMD(tag string, operations []Operation) s
 func (sg *SkillsGenerator) generateReferenceMD(tag string, operations []Operation) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("# %s API Reference\n\n", toTitleCase(tag)))
+	fmt.Fprintf(&sb, "# %s API Reference\n\n", toTitleCase(tag))
 
 	for _, op := range operations {
-		sb.WriteString(fmt.Sprintf("## %s\n\n", op.ToolName))
-		sb.WriteString(fmt.Sprintf("**Method**: %s\n\n", op.Method))
-		sb.WriteString(fmt.Sprintf("**Path**: `%s`\n\n", op.Path))
+		fmt.Fprintf(&sb, "## %s\n\n", op.ToolName)
+		fmt.Fprintf(&sb, "**Method**: %s\n\n", op.Method)
+		fmt.Fprintf(&sb, "**Path**: `%s`\n\n", op.Path)
 
 		if op.Spec.Summary != "" {
-			sb.WriteString(fmt.Sprintf("**Summary**: %s\n\n", op.Spec.Summary))
+			fmt.Fprintf(&sb, "**Summary**: %s\n\n", op.Spec.Summary)
 		}
 
 		if op.Spec.Description != "" {
-			sb.WriteString(fmt.Sprintf("**Description**: %s\n\n", op.Spec.Description))
+			fmt.Fprintf(&sb, "**Description**: %s\n\n", op.Spec.Description)
 		}
 
 		// Parameters
@@ -224,8 +224,8 @@ func (sg *SkillsGenerator) generateReferenceMD(tag string, operations []Operatio
 				if paramType == "" && param.Schema != nil && len(param.Schema.Type) > 0 {
 					paramType = param.Schema.Type[0]
 				}
-				sb.WriteString(fmt.Sprintf("| %s | %s | %s | %s | %s |\n",
-					param.Name, param.In, paramType, required, getParamDescription(param)))
+				fmt.Fprintf(&sb, "| %s | %s | %s | %s | %s |\n",
+					param.Name, param.In, paramType, required, getParamDescription(param))
 			}
 			sb.WriteString("\n")
 		}
@@ -234,9 +234,9 @@ func (sg *SkillsGenerator) generateReferenceMD(tag string, operations []Operatio
 		if op.Spec.Responses != nil && len(op.Spec.Responses.StatusCodeResponses) > 0 {
 			sb.WriteString("### Responses\n\n")
 			for code, response := range op.Spec.Responses.StatusCodeResponses {
-				sb.WriteString(fmt.Sprintf("#### %d\n", code))
+				fmt.Fprintf(&sb, "#### %d\n", code)
 				if response.Description != "" {
-					sb.WriteString(fmt.Sprintf("%s\n\n", response.Description))
+					fmt.Fprintf(&sb, "%s\n\n", response.Description)
 				}
 				if response.Schema != nil {
 					sb.WriteString("**Schema**:\n```json\n")
@@ -258,13 +258,13 @@ func (sg *SkillsGenerator) generateSkillsIndex(tagGroups map[string][]Operation)
 
 	sb.WriteString("# API Skills Index\n\n")
 	sb.WriteString("This directory contains Agent Skills generated from the OpenAPI/Swagger specification.\n\n")
-	sb.WriteString(fmt.Sprintf("**API Base URL**: %s\n\n", sg.apiBaseURL))
+	fmt.Fprintf(&sb, "**API Base URL**: %s\n\n", sg.apiBaseURL)
 	sb.WriteString("## Available Skills\n\n")
 
 	for tag, operations := range tagGroups {
-		sb.WriteString(fmt.Sprintf("### [%s](./%s/SKILL.md)\n\n", toTitleCase(tag), tag))
-		sb.WriteString(fmt.Sprintf("%s\n\n", sg.generateDescription(tag, operations)))
-		sb.WriteString(fmt.Sprintf("**Operations**: %d\n\n", len(operations)))
+		fmt.Fprintf(&sb, "### [%s](./%s/SKILL.md)\n\n", toTitleCase(tag), tag)
+		fmt.Fprintf(&sb, "%s\n\n", sg.generateDescription(tag, operations))
+		fmt.Fprintf(&sb, "**Operations**: %d\n\n", len(operations))
 	}
 
 	return os.WriteFile(filepath.Join(sg.outputDir, "INDEX.md"), []byte(sb.String()), 0644)
